@@ -1,0 +1,229 @@
+# ==============================================================================
+# Comprehensive .gitignore for AI / Deep Learning / Computer Vision Projects
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Bytecode, Compilers & Python Cache
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.dll
+*.dylib
+
+# C / C++ / CUDA Build Artifacts (Custom CUDA Ops, TensorRT, PyTorch C++ Extensions)
+*.o
+*.obj
+*.cu.o
+*.cpp.o
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+MANIFEST
+
+# ------------------------------------------------------------------------------
+# 2. Virtual Environments & Package Managers
+# ------------------------------------------------------------------------------
+venv/
+.venv/
+env/
+.env_*/
+ENV/
+conda-env/
+pip-wheel-metadata/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ------------------------------------------------------------------------------
+# 3. Datasets & Raw Annotation Data (Large Files)
+# ------------------------------------------------------------------------------
+# Common Data Directories
+data/
+datasets/
+raw_data/
+processed_data/
+annotations/
+train/
+val/
+test/
+
+# Image & Video Raw Media Formats
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tiff
+*.tif
+*.webp
+*.gif
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# 3D, LiDAR & Point Cloud Formats
+*.pcd
+*.ply
+*.las
+*.laz
+*.pts
+*.bin
+
+# Heavy Matrix & Tabular Data Formats
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.tfrecord
+*.tfrecords
+*.parquet
+*.feather
+*.pkl
+*.pickle
+
+# ------------------------------------------------------------------------------
+# 4. Model Weights, Checkpoints & Pretrained Backbones
+# ------------------------------------------------------------------------------
+# Common Model Weights Extensions
+*.pt
+*.pth
+*.pwf
+*.ckpt
+*.weights
+*.safetensors
+*.bin
+*.onnx
+*.tflite
+*.engine
+*.trt
+*.pb
+*.joblib
+
+# Common Weights / Checkpoints Folders
+checkpoints/
+weights/
+saved_models/
+pretrained/
+backbones/
+models_cache/
+.cache/
+huggingface/
+torch/
+
+# ------------------------------------------------------------------------------
+# 5. Training Runs, Logs & Evaluation Artifacts
+# ------------------------------------------------------------------------------
+runs/
+logs/
+log/
+outputs/
+output/
+experiments/
+eval/
+evaluations/
+results/
+lightning_logs/
+tensorboard_logs/
+events.out.tfevents.*
+work_dirs/
+
+# ------------------------------------------------------------------------------
+# 6. MLOps, Experiment Tracking & Framework Specifics
+# ------------------------------------------------------------------------------
+# Weights & Biases (WandB)
+wandb/
+.wandb/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# DVC (Data Version Control) - Keep tracker files, ignore cache/tmp
+.dvc/cache
+.dvc/tmp
+.dvc/updater
+
+# ClearML / Comet / Neptune
+.clearml/
+.comet/
+.neptune/
+
+# Ultralytics (YOLO) auto-generated cache & predictions
+yolo*.pt
+runs/detect/
+runs/segment/
+runs/train/
+runs/val/
+runs/pose/
+runs/classify/
+*.cache
+
+# ------------------------------------------------------------------------------
+# 7. Jupyter Notebooks & Interactive Environments
+# ------------------------------------------------------------------------------
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+.virtual_documents/
+
+# Google Colab / Kaggle runtime artifacts
+.colab/
+drive/
+
+# ------------------------------------------------------------------------------
+# 8. Environment Variables, Secrets & API Credentials
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+secrets.json
+credentials.json
+kaggle.json
+roboflow.json
+wandb.key
+*.pem
+*.key
+
+# ------------------------------------------------------------------------------
+# 9. IDEs, OS & Editor Configuration
+# ------------------------------------------------------------------------------
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# VS Code (ignore everything except shared configs if needed)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (PyCharm, CLion)
+.idea/
+*.iml
+
+# ------------------------------------------------------------------------------
+# 10. Temporary, Scratchpads & Profiling Files
+# ------------------------------------------------------------------------------
+tmp/
+temp/
+scratch/
+debug/
+*.log
+*.prof
+*.pstats
+*.trace
