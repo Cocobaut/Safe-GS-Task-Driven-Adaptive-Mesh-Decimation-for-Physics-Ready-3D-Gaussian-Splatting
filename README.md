@@ -1,3 +1,6 @@
+## 📂 Cấu trúc dự án (Project Structure)
+
+```text
 adaptive-macro-micro-gs/
 │
 ├── configs/                          # Quản lý cấu hình huấn luyện và mô phỏng
@@ -66,3 +69,4 @@ adaptive-macro-micro-gs/
 │
 ├── requirements.txt                  # Python dependencies (PyTorch, PyBullet, MuJoCo, Open3D, Trimesh, CGAL)
 └── README.md                         # Hướng dẫn cài đặt, cấu hình pipeline và reproduce kết quả
+```
