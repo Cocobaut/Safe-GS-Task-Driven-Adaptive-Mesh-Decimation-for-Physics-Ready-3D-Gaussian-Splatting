@@ -1,0 +1,20 @@
+[project]
+name = "project-safe-gs"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Cocobaut", email = "quangkhaisaigonhcm@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy<2",
+    "pandas",
+]
+
+[project.scripts]
+project-safe-gs = "project_safe_gs:main"
+
+[build-system]
+requires = ["uv_build>=0.12.7,<0.13.0"]
+build-backend = "uv_build"

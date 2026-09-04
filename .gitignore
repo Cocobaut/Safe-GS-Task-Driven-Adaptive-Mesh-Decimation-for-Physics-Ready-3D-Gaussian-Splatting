@@ -227,3 +227,7 @@ debug/
 *.prof
 *.pstats
 *.trace
+
+Dataset/DTU/
+Dataset/dtu_results/
+Dataset/eval_dtu/
