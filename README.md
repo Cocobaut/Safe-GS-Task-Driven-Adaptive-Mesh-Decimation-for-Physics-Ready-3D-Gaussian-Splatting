@@ -1,7 +1,7 @@
 ## 📂 Cấu trúc dự án (Project Structure)
 
 ```text
-adaptive-macro-micro-gs/
+Project_Safe_GS/
 │
 ├── configs/                          # Quản lý cấu hình huấn luyện và mô phỏng
 │   ├── base_scene.yaml               # Config huấn luyện Scene-GS (20k iters, camera settings)
@@ -9,7 +9,7 @@ adaptive-macro-micro-gs/
 │   ├── gof_meshing.yaml              # Config GOF (Tetrahedral grid, level set, binary search steps)
 │   └── simulation.yaml               # Config Physics (MuJoCo/PhysX/PyBullet parameters, timestep)
 │
-├── data/                             # Dữ liệu & kết quả trung gian
+├── Data/                             # Dữ liệu & kết quả trung gian
 │   ├── raw/                          # Dữ liệu ảnh thô (RGB images, camera captures)
 │   ├── sfm/                          # Kết quả Colmap/SfM (cameras.bin, images.bin, points3D.bin)
 │   ├── segmentation/                 # 2D Masks trích xuất từ SAM / GroundingDINO
