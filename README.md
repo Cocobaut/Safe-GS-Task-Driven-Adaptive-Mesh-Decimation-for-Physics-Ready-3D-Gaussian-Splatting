@@ -3,11 +3,11 @@
 ```text
 Project_Safe_GS/
 │
-├── configs/                          # Quản lý cấu hình huấn luyện và mô phỏng
-│   ├── base_scene.yaml               # Config huấn luyện Scene-GS (20k iters, camera settings)
-│   ├── object_roi.yaml               # Config huấn luyện Object-GS (AABB, densification threshold)
-│   ├── gof_meshing.yaml              # Config GOF (Tetrahedral grid, level set, binary search steps)
-│   └── simulation.yaml               # Config Physics (MuJoCo/PhysX/PyBullet parameters, timestep)
+├── configs/                            # Quản lý cấu hình huấn luyện và mô phỏng
+│   ├── base_scene.yaml                 # Config huấn luyện Scene-GS (20k iters, camera settings)
+│   ├── object_roi.yaml                 # Config huấn luyện Object-GS (AABB, densification threshold)
+│   ├── gof_meshing.yaml                # Config GOF (Tetrahedral grid, level set, binary search steps)
+│   └── simulation.yaml                 # Config Physics (MuJoCo/PhysX/PyBullet parameters, timestep)
 │
 ├── Data/                             # Dữ liệu & kết quả trung gian
 │   ├── raw/                          # Dữ liệu ảnh thô (RGB images, camera captures)
@@ -56,9 +56,10 @@ Project_Safe_GS/
 │       ├── topology_guard.py         # State Machine 5 trạng thái (Async rebuilder, Bounding volume check)
 │       └── benchmarks.py             # Thu thập số liệu: Simulation FPS, Penetration Error, NaN Forces
 │
-├── scripts/                          # Entry points chạy pipeline thực thi
-│   ├── run_stage1_perception.py      # Chạy Module 1 + 3 (SfM -> Segment -> 3D ROI)
-│   ├── run_stage2_training.py        # Chạy Module 2 + 4 (Scene-GS -> Object-GS -> Composition)
+├── scripts/                                # Entry points chạy pipeline thực thi
+│   ├── run_stage1_perception.py            # Chạy Module 1 + 3 (SfM -> Segment -> 3D ROI)
+│   ├── run_stage2_scene_gs_training.py     # Chạy Module 2 (Scene-GS)
+|   ├── run_stage2_object_gs_training.py    # Chạy Module 4 (Object-GS -> Composition)
 │   ├── run_stage3_meshing.py         # Chạy Module 4 (GOF Extraction) + Module 5 (Hậu xử lý)
 │   └── run_simulation.py             # Chạy Module 6 (Nạp Mesh vào Simulator kiểm thử)
 │
