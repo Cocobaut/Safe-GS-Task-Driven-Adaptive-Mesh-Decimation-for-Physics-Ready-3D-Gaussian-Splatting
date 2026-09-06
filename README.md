@@ -9,65 +9,71 @@ Project_Safe_GS/
 │   ├── gof_meshing.yaml                # Config GOF (Tetrahedral grid, level set, binary search steps)
 │   └── simulation.yaml                 # Config Physics (MuJoCo/PhysX/PyBullet parameters, timestep)
 │
-├── Data/                             # Dữ liệu & kết quả trung gian
-│   ├── raw/                          # Dữ liệu ảnh thô (RGB images, camera captures)
-│   ├── sfm/                          # Kết quả Colmap/SfM (cameras.bin, images.bin, points3D.bin)
-│   ├── segmentation/                 # 2D Masks trích xuất từ SAM / GroundingDINO
-│   └── workspace/                    # Cache trung gian qua từng module
-│       ├── roi_boxes/                # Tọa độ 3D AABB / Voxel grid metadata (JSON/YAML)
-│       ├── checkpoints/              # Checkpoints cho Scene-GS và Object-GS (.ply, .pt)
-│       └── meshes/                   # Mesh xuất ra (.obj, .ply, watertight/processed)
+├── data/                               # Dữ liệu & kết quả trung gian (chuẩn hóa chữ thường)
+│   ├── raw/                            # Dữ liệu ảnh thô (RGB images, camera captures)
+│   ├── sfm/                            # Kết quả Colmap/SfM (cameras.bin, images.bin, points3D.bin)
+│   ├── segmentation/                   # 2D Masks trích xuất từ SAM / GroundingDINO
+│   └── workspace/                      # Cache trung gian qua từng module
+│       ├── roi_boxes/                  # Tọa độ 3D AABB / Voxel grid metadata (JSON/YAML)
+│       ├── checkpoints/                # Checkpoints: scene_gs.ply, object_gs.ply, composed_3dgs.ply
+│       └── meshes/                     # Mesh xuất ra: raw_gof.obj, watertight.obj, decimated.obj
 │
-├── submodules/                       # Custom CUDA Kernels hoặc C++ extensions
-│   ├── diff_gaussian_rasterization/  # Rasterizer gốc hoặc tùy biến
-│   └── gof_cuda/                     # Custom Ray-Gaussian intersection & Opacity evaluation CUDA
+├── submodules/                         # Custom CUDA Kernels hoặc C++ extensions
+│   ├── diff_gaussian_rasterization/    # Rasterizer gốc hoặc tùy biến
+│   └── gof_cuda/                       # Custom Ray-Gaussian intersection & Opacity evaluation CUDA
 │
-├── src/                              # Mã nguồn chính phân tầng theo Modules
+├── src/                                # Mã nguồn chính chuẩn hóa khớp 100% với 6 Modules
 │   ├── __init__.py
 │   │
-│   ├── module1_perception/           # Module 1: SfM & 2D Segmentation
-│   │   ├── sfm_pipeline.py           # Tự động hóa COLMAP / trích xuất camera poses, intrinsics
-│   │   └── segmenter.py              # SAM2 / LangSAM trích xuất 2D Mask theo text prompt/vật thể
+│   ├── module1_perception/             # Module 1: SfM & 2D Segmentation
+│   │   ├── sfm_pipeline.py             # Tự động hóa COLMAP / trích xuất camera poses, intrinsics
+│   │   └── segmenter.py                # SAM2 / LangSAM trích xuất 2D Mask
 │   │
-│   ├── module2_scene_gs/             # Module 2: Global Coarse Scene Training
-│   │   ├── scene_trainer.py          # Huấn luyện Scene-GS (20K iters theo chiến lược ROI-GS)
-│   │   └── camera_scheduler.py       # Phân loại góc nhìn toàn cảnh vs góc nhìn cục bộ
+│   ├── module2_scene_and_roi/          # Module 2: Nhánh song song Scene-GS & 3D ROI
+│   │   ├── scene_branch/               # Nhánh 1: Scene-GS
+│   │   │   ├── scene_trainer.py        # Huấn luyện Scene-GS (20K iters theo chiến lược ROI-GS)
+│   │   │   └── camera_scheduler.py     # Phân loại góc nhìn toàn cảnh vs góc nhìn cận cảnh
+│   │   └── roi_branch/                 # Nhánh 2: 3D ROI & Space Partitioning
+│   │       ├── mask_to_3d.py           # Chiếu ngược Mask 2D + Mây điểm SfM lên không gian 3D
+│   │       ├── aabb_generator.py       # Tính toán 3D Bounding Box (AABB/OBB) và Voxel Grid
+│   │       └── view_selection.py       # Lọc danh sách Camera tối ưu cho vùng ROI
 │   │
-│   ├── module3_roi_3d/               # Module 3: 3D ROI & Space Partitioning
-│   │   ├── mask_to_3d.py             # Chiếu ngược Mask 2D + Depth/SfM keypoints lên không gian 3D
-│   │   ├── aabb_generator.py         # Tính toán 3D Bounding Box (AABB/OBB) và Voxel Grid
-│   │   └── view_selection.py         # Thuật toán chọn Camera tối ưu cho ROI (ActiveInitSplat / GP)
+│   ├── module3_object_composition/     # Module 3: Object-GS & 3DGS Hoàn chỉnh
+│   │   ├── object_trainer.py           # Huấn luyện Object-GS khởi tạo từ Scene-GS, densify trong ROI
+│   │   └── gs_composer.py              # Hoán đổi hạt trong AABB -> sinh Composed-3DGS
 │   │
-│   ├── module4_object_gof/           # Module 4: Object-GS Training & GOF Meshing
-│   │   ├── object_trainer.py         # Huấn luyện Object-GS khởi tạo từ Scene-GS, densify trong ROI
-│   │   ├── gs_composer.py            # Hợp nhất hạt Scene-GS và Object-GS theo tọa độ SfM
-│   │   ├── opacity_field.py          # Định nghĩa trường độ đục GOF (Ray-Gaussian intersection, Min Opacity)
-│   │   ├── regularization.py         # Depth Distortion Loss & Normal Consistency Loss
-│   │   └── marching_tetrahedra.py    # Marching Tetrahedra + Binary Search tìm Level-set 0.5
+│   ├── module4_gof_meshing/            # Module 4: Trích xuất Mesh bằng GOF (Tách riêng biệt)
+│   │   ├── opacity_field.py            # Ray-Gaussian intersection & Min Opacity field
+│   │   ├── regularization.py           # Depth Distortion Loss & Normal Consistency Loss
+│   │   ├── marching_tetrahedra.py      # Marching Tetrahedra từ Delaunay tetrahedral grid
+│   │   └── level_set_solver.py         # Binary Search 8 bước tìm đẳng diện 0.5
 │   │
-│   ├── module5_postprocessing/       # Module 5: Mesh Decimation & Watertight Sewing
-│   │   ├── mesh_cleaner.py           # Lọc floaters, tam giác dị hình, isolated vertices
-│   │   ├── adaptive_decimator.py     # Gộp lưới Macro (thô) - Micro (mịn) theo Task ROI
-│   │   └── watertight_sewer.py       # Ghép nối đường biên tiếp giáp (Boundary Stitching/Watertight)
+│   ├── module5_postprocessing/         # Module 5: Gộp mesh, làm sạch, Watertight Sewing
+│   │   ├── mesh_cleaner.py             # Lọc floaters, tam giác dị hình, isolated vertices
+│   │   ├── adaptive_decimator.py       # Gộp lưới Macro (thô) - Micro (mịn) theo Task ROI
+│   │   └── watertight_sewer.py         # May kín đường biên tiếp giáp (Boundary Sewing)
 │   │
-│   └── module6_physics/              # Module 6: Physics Engine Integration & Topology Guard
-│       ├── env_mujoco.py             # Môi trường mô phỏng MuJoCo / PyBullet
-│       ├── collision_verifier.py     # Kiểm tra va chạm rác (False Positives) & bảo toàn khe rỗng
-│       ├── topology_guard.py         # State Machine 5 trạng thái (Async rebuilder, Bounding volume check)
-│       └── benchmarks.py             # Thu thập số liệu: Simulation FPS, Penetration Error, NaN Forces
+│   └── module6_physics/                # Module 6: Physics Engine Integration & Topology Guard
+│       ├── env_mujoco.py               # Môi trường mô phỏng MuJoCo / PyBullet
+│       ├── collision_verifier.py       # Đo va chạm ma (FP) và kiểm tra bảo toàn lỗ rỗng quai cầm (FN)
+│       ├── topology_guard.py           # State Machine 5 trạng thái quản lý hoán đổi an toàn
+│       └── benchmarks.py               # Đo Simulation FPS, tỷ lệ nổ mô phỏng (NaN force)
 │
-├── scripts/                                # Entry points chạy pipeline thực thi
-│   ├── run_stage1_perception.py            # Chạy Module 1 + 3 (SfM -> Segment -> 3D ROI)
-│   ├── run_stage2_scene_gs_training.py     # Chạy Module 2 (Scene-GS)
-|   ├── run_stage2_object_gs_training.py    # Chạy Module 4 (Object-GS -> Composition)
-│   ├── run_stage3_meshing.py         # Chạy Module 4 (GOF Extraction) + Module 5 (Hậu xử lý)
-│   └── run_simulation.py             # Chạy Module 6 (Nạp Mesh vào Simulator kiểm thử)
+├── scripts/                            # Entry points trực quan theo tiến trình
+│   ├── 01_run_perception.py            # Chạy Module 1 (SfM + Segment)
+│   ├── 02_run_scene_gs.py              # Chạy Module 2 - Nhánh Scene-GS
+│   ├── 02_run_roi_3d.py                # Chạy Module 2 - Nhánh ROI 3D
+│   ├── 03_run_object_and_compose.py    # Chạy Module 3 (Object-GS -> Composed 3DGS)
+│   ├── 04_run_gof_meshing.py           # Chạy Module 4 (Trích xuất Mesh thô từ Composed-3DGS)
+│   ├── 05_run_postprocessing.py        # Chạy Module 5 (Decimation + Watertight Mesh)
+│   └── 06_run_simulation.py            # Chạy Module 6 (Nạp Mesh vào Simulator kiểm thử)
 │
-├── tests/                            # Unit tests từng thành phần độc lập
-│   ├── test_opacity_eval.py
+├── tests/                              # Unit tests kiểm tra từng module
+│   ├── test_roi_projection.py
+│   ├── test_gof_extraction.py
 │   ├── test_watertight.py
-│   └── test_physics_swap.py
+│   └── test_topology_guard.py
 │
-├── requirements.txt                  # Python dependencies (PyTorch, PyBullet, MuJoCo, Open3D, Trimesh, CGAL)
-└── README.md                         # Hướng dẫn cài đặt, cấu hình pipeline và reproduce kết quả
+├── requirements.txt
+└── README.md
 ```
