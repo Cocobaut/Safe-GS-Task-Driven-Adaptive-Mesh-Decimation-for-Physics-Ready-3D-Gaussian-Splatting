@@ -45,7 +45,7 @@ htmlcov/
 # 3. Datasets & Raw Annotation Data (Large Files)
 # ------------------------------------------------------------------------------
 # Common Data Directories
-data/
+# data/
 datasets/
 raw_data/
 processed_data/
@@ -228,6 +228,11 @@ debug/
 *.pstats
 *.trace
 
-Dataset/DTU/
-Dataset/dtu_results/
-Dataset/eval_dtu/
+Data/DTU/
+Data/dtu_results/
+Data/eval_dtu/
+
+!Data/*.md
+!Data/**/*.md
+!Data/*.md
+!Data/**/*.md
