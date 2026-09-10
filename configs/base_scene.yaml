@@ -1,0 +1,9 @@
+iterations: 20000
+sh_degree: 3
+spatial_lr_scale: 1.0
+close_up_ratio_threshold: 0.08
+roi_sample_rate: 0.5
+
+sfm_dir: "E:/Hcmut material/Project_Safe_GS/tmp/sfm/sparse/0"
+mask_meta: "E:/Hcmut material/Project_Safe_GS/tmp/mask/segmentation_meta.json"
+workspace_dir: "E:/Hcmut material/Project_Safe_GS/tmp/workspace"
