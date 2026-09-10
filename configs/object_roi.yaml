@@ -1,0 +1,20 @@
+# Cấu hình Nhánh ROI 3D (Module 2)
+sfm_dir: "E:/Hcmut material/Project_Safe_GS/tmp/sfm/sparse/0"
+masks_dir: "E:/Hcmut material/Project_Safe_GS/tmp/mask"
+workspace_dir: "E:/Hcmut material/Project_Safe_GS/tmp/workspace"
+
+min_views_consensus: 2
+margin_ratio: 0.1
+boundary_margin_ratio: 0.2
+voxel_size: 0.02
+
+# Lựa chọn góc máy ROI
+max_roi_cameras: 150
+min_keypoints_visible: 3
+min_projected_area_ratio: 0.01
+
+# Tham số huấn luyện Object-GS (Module 3)
+iterations: 30000
+densify_until_iter: 15000
+pruning_interval: 1000
+opacity_threshold: 0.05
