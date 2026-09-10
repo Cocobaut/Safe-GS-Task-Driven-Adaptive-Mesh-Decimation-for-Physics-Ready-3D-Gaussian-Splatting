@@ -256,8 +256,17 @@ class SfMPipeline:
 
 
 if __name__ == "__main__":
-    raw_images = r"E:\Hcmut material\Project_Safe_GS\Data\Replica\office0\results\image"
-    sfm_output = r"E:\Hcmut material\Project_Safe_GS\tmp\sfm"
+    # Doc duong dan tu configs/base_scene.toml thay vi hard-code (thay doi
+    # duong dan khi chuyen may chi can sua file config, khong sua code).
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
+
+    with open("configs/base_scene.toml", "rb") as f:
+        _cfg = tomllib.load(f)
+    raw_images = _cfg.get("raw_image_dir", "data/raw")
+    sfm_output = str(Path(_cfg.get("workspace_dir", "data/workspace")) / "sfm")
 
     if Path(raw_images).exists() and any(Path(raw_images).iterdir()):
         sfm = SfMPipeline(

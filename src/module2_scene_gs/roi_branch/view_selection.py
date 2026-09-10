@@ -241,17 +241,27 @@ class ROIViewSelector:
 
 
 if __name__ == "__main__":
-    sfm_directionary = r"E:\Hcmut material\Project_Safe_GS\tmp\sfm\sparse\0"
-    roi_meta = r"E:\Hcmut material\Project_Safe_GS\tmp\workspace\roi_boxes\roi_metadata.json"
-    output_schedule = r"E:\Hcmut material\Project_Safe_GS\tmp\workspace\roi_boxes\roi_camera_schedule.json"
+    # Doc duong dan tu configs/object_roi.toml thay vi hard-code (thay doi
+    # duong dan khi chuyen may chi can sua file config, khong sua code).
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
+
+    with open("configs/object_roi.toml", "rb") as f:
+        _cfg = tomllib.load(f)
+    _roi_boxes_dir = Path(_cfg.get("workspace_dir", "data/workspace")) / "roi_boxes"
+    sfm_directionary = _cfg.get("sfm_dir", "data/sfm/sparse/0")
+    roi_meta = _roi_boxes_dir / "roi_metadata.json"
+    output_schedule = _roi_boxes_dir / "roi_camera_schedule.json"
 
     if Path(roi_meta).exists():
         selector = ROIViewSelector(
             sfm_sparse_dir=sfm_directionary,
             roi_metadata_path=roi_meta,
-            min_keypoints_visible=1,
-            min_projected_area_ratio=0.01
+            min_keypoints_visible=_cfg.get("min_keypoints_visible", 3),
+            min_projected_area_ratio=_cfg.get("min_projected_area_ratio", 0.01)
         )
-        selector.export_schedule(output_schedule, max_cameras=150)
+        selector.export_schedule(output_schedule, max_cameras=_cfg.get("max_roi_cameras", 150))
     else:
         print(f"[!] Chưa có file {roi_meta}. Vui lòng chạy aabb_generator.py trước.")

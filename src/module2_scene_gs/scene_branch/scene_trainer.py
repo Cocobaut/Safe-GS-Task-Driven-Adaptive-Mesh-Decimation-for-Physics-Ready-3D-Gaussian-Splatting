@@ -2,7 +2,6 @@ import os
 import sys
 import math
 import random
-import yaml
 import torch
 import numpy as np
 from pathlib import Path
@@ -16,6 +15,7 @@ try:
 except ImportError:
     print("[Error] Cảnh báo: Chưa biên dịch diff-gaussian-rasterization hoặc simple-knn trong submodules/")
 
+from src.common.config_loader import load_toml_config
 from src.module2_scene_gs.scene_branch.camera_scheduler import CameraScheduler
 
 
@@ -142,9 +142,8 @@ class SceneGSTrainer:
     """
     Bộ điều khiển huấn luyện toàn cảnh Scene-GS (20k iterations).
     """
-    def __init__(self, config_path: str = "configs/base_scene.yaml"):
-        with open(config_path, "r", encoding="utf-8") as f:
-            self.cfg = yaml.safe_load(f)
+    def __init__(self, config_path: str = "configs/base_scene.toml"):
+        self.cfg = load_toml_config(config_path)
 
         self.iterations = self.cfg.get("iterations", 20000)
         self.output_dir = Path(self.cfg.get("workspace_dir", "data/workspace"))

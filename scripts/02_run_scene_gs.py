@@ -4,7 +4,7 @@ from pathlib import Path
 # Thêm thư mục gốc vào PYTHONPATH
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from src.module2_scene_and_roi.scene_branch.scene_trainer import SceneGSTrainer
+from src.module2_scene_gs.scene_branch.scene_trainer import SceneGSTrainer
 
 
 def main():
@@ -12,7 +12,7 @@ def main():
     print(">>> BẮT ĐẦU CHẠY MODULE 2: NHÁNH SCENE-GS TRAINING <<<")
     print("=" * 60)
 
-    config_path = "configs/base_scene.yaml"
+    config_path = "configs/base_scene.toml"
     trainer = SceneGSTrainer(config_path=config_path)
     trainer.train()
 

@@ -120,10 +120,10 @@ def _unbatched_marching_tetrahedra(
     tets: torch.Tensor,
     sdf: torch.Tensor,
     scales: torch.Tensor,
+    chunk_size: int = 32 * 1024 * 1024,
 ):
     device = vertices.device
 
-    chunk_size = 32 * 1024 * 1024
     if tets.shape[0] > chunk_size:
         merged_verts = None
         merged_scales = None
@@ -132,7 +132,7 @@ def _unbatched_marching_tetrahedra(
         for tet_chunk in torch.chunk(tets, tets.shape[0] // chunk_size + 1):
             torch.cuda.empty_cache()
             verts, verts_scales, faces, verts_ids = _unbatched_marching_tetrahedra(
-                vertices, tet_chunk, sdf, scales
+                vertices, tet_chunk, sdf, scales, chunk_size
             )
             if merged_verts is None:
                 merged_verts, merged_scales, merged_faces, merged_verts_ids = (
@@ -224,6 +224,7 @@ def marching_tetrahedra(
     tets: torch.Tensor,
     sdf: torch.Tensor,
     scales: torch.Tensor,
+    chunk_size: int = 32 * 1024 * 1024,
 ) -> Tuple[List, List, List, List]:
     """Chuyen SDF roi rac tren luoi tu dien thanh mesh tam giac (khu vi
     phan duoc theo vi tri dinh va gia tri SDF).
@@ -234,13 +235,15 @@ def marching_tetrahedra(
         sdf: (B, N) gia tri SDF tai moi dinh.
         scales: (B, N) scale cua Gaussian gan nhat voi moi dinh (dung de
             loc mesh o buoc hau xu ly).
+        chunk_size: so tu dien xu ly toi da moi lan de tranh OOM tren GPU
+            (configs/gof_meshing.toml::chunk_size).
 
     Returns:
         verts_list, scale_list, faces_list, edge_ids_list — moi phan tu
         ung voi mot item trong batch.
     """
     outputs = [
-        _unbatched_marching_tetrahedra(vertices[b], tets, sdf[b], scales[b])
+        _unbatched_marching_tetrahedra(vertices[b], tets, sdf[b], scales[b], chunk_size)
         for b in range(vertices.shape[0])
     ]
     return list(zip(*outputs))

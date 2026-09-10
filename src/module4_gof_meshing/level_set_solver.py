@@ -114,6 +114,8 @@ def extract_mesh_gof(
     near: float = 0.02,
     far: float = 1e6,
     box_scale: float = 3.0,
+    iso_level: float = ISO_LEVEL,
+    chunk_size: int = 32 * 1024 * 1024,
     n_binary_steps: int = N_BINARY_STEPS,
     filter_mesh: bool = True,
     texture_mesh: bool = False,
@@ -134,11 +136,11 @@ def extract_mesh_gof(
     cells = delaunay_triangulate(points)
 
     alpha = evaluate_min_opacity_field(points, views, integrate_fn, desc="Danh gia opacity field ban dau")
-    sdf = sdf_from_alpha(alpha)
+    sdf = sdf_from_alpha(alpha, iso_level)
 
     torch.cuda.empty_cache()
     verts_list, scale_list, faces_list, _ = marching_tetrahedra(
-        points[None], cells, sdf[None], point_scales[None]
+        points[None], cells, sdf[None], point_scales[None], chunk_size
     )
     torch.cuda.empty_cache()
 
@@ -159,3 +161,32 @@ def extract_mesh_gof(
     )
 
     return build_mesh(final_points, faces, vertex_colors, distance, edge_scale, filter_mesh)
+
+
+def extract_mesh_gof_from_config(
+    gaussians: object,
+    views: Sequence[object],
+    integrate_fn: IntegrateFn,
+    config_path: str,
+) -> trimesh.Trimesh:
+    """Nhu ``extract_mesh_gof`` nhung doc toan bo tham so tu
+    ``configs/gof_meshing.toml`` thay vi truyen tay tung gia tri.
+
+    Day la entry point du kien cho scripts/04_run_gof_meshing.py.
+    """
+    from src.common.config_loader import load_toml_config
+
+    cfg = load_toml_config(config_path)
+    return extract_mesh_gof(
+        gaussians,
+        views,
+        integrate_fn,
+        near=cfg.get("near", 0.02),
+        far=cfg.get("far", 1e6),
+        box_scale=cfg.get("box_scale", 3.0),
+        iso_level=cfg.get("iso_level", ISO_LEVEL),
+        chunk_size=cfg.get("chunk_size", 32 * 1024 * 1024),
+        n_binary_steps=cfg.get("n_binary_steps", N_BINARY_STEPS),
+        filter_mesh=cfg.get("filter_mesh", True),
+        texture_mesh=cfg.get("texture_mesh", False),
+    )

@@ -131,11 +131,25 @@ class AABBGenerator:
 
 
 if __name__ == "__main__":
-    roi_points_file = r"E:\Hcmut material\Project_Safe_GS\tmp\workspace\roi_boxes\roi_points.ply"
-    output_metadata = r"E:\Hcmut material\Project_Safe_GS\tmp\workspace\roi_boxes\roi_metadata.json"
+    # Doc duong dan tu configs/object_roi.toml thay vi hard-code (thay doi
+    # duong dan khi chuyen may chi can sua file config, khong sua code).
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
+
+    with open("configs/object_roi.toml", "rb") as f:
+        _cfg = tomllib.load(f)
+    _roi_boxes_dir = Path(_cfg.get("workspace_dir", "data/workspace")) / "roi_boxes"
+    roi_points_file = _roi_boxes_dir / "roi_points.ply"
+    output_metadata = _roi_boxes_dir / "roi_metadata.json"
 
     if Path(roi_points_file).exists():
-        generator = AABBGenerator(margin_ratio=0.1, voxel_size=0.02)
+        generator = AABBGenerator(
+            margin_ratio=_cfg.get("margin_ratio", 0.1),
+            voxel_size=_cfg.get("voxel_size", 0.02),
+            boundary_margin_ratio=_cfg.get("boundary_margin_ratio", 0.2),
+        )
         generator.process_and_save(roi_points_file, output_metadata)
     else:
         print(f"[Error] Chưa có file {roi_points_file}. Vui lòng chạy mask_to_3d.py trước.")

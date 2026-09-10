@@ -114,21 +114,38 @@ def normal_consistency_loss(
 def compute_gof_regularization(
     rendering: torch.Tensor,
     view: object,
+    iteration: int | None = None,
+    config: dict | None = None,
     gt_image: torch.Tensor | None = None,
     edge_aware_distortion: bool = False,
 ) -> dict:
     """Goi tat ca regularizer tu mot ``rendering`` tensor theo dung layout
     cua GOF: kenh [3:6]=normal, [6]=depth, [8]=distortion.
 
-    Tra ve dict {"distortion_loss", "normal_consistency_loss"} de
-    scripts/03_run_object_and_compose.py (hoac buoc fine-tune truoc khi
-    trich mesh) cong voi trong so lambda tu configs/gof_meshing.yaml.
+    Mac dinh (khong truyen ``iteration``/``config``) tra ve raw losses,
+    khong nhan trong so — giu nguyen hanh vi cu de tuong thich nguoc.
+
+    Neu truyen ca ``iteration`` va ``config`` (dict tu
+    ``configs/gof_meshing.toml``), tinh them ``"weighted_loss"`` theo dung
+    lambda-schedule cua GOF: ``lambda_distortion`` chi ap dung tu
+    ``distortion_from_iter``, ``lambda_depth_normal`` chi ap dung tu
+    ``depth_normal_from_iter`` (xem train.py cua GOF).
     """
     distortion_map = rendering[8, :, :]
     depth = rendering[6, :, :][None, ...]
     render_normal = rendering[3:6, :, :]
 
-    return {
+    result = {
         "distortion_loss": depth_distortion_loss(distortion_map, gt_image, edge_aware_distortion),
         "normal_consistency_loss": normal_consistency_loss(render_normal, depth, view),
     }
+
+    if iteration is not None and config is not None:
+        lambda_distortion = config.get("lambda_distortion", 0.0) if iteration >= config.get("distortion_from_iter", 0) else 0.0
+        lambda_depth_normal = config.get("lambda_depth_normal", 0.0) if iteration >= config.get("depth_normal_from_iter", 0) else 0.0
+        result["weighted_loss"] = (
+            result["distortion_loss"] * lambda_distortion
+            + result["normal_consistency_loss"] * lambda_depth_normal
+        )
+
+    return result

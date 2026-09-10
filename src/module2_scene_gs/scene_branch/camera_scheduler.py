@@ -109,14 +109,24 @@ class CameraScheduler:
 
 
 if __name__ == "__main__":
-    sfm_path = r"E:\Hcmut material\Project_Safe_GS\tmp\sfm\sparse\0"
-    mask_meta = r"E:\Hcmut material\Project_Safe_GS\tmp\mask\segmentation_meta.json"
-    out_schedule = r"E:\Hcmut material\Project_Safe_GS\tmp\workspace\scene_camera_schedule.json"
+    # Doc duong dan tu configs/base_scene.toml thay vi hard-code (thay doi
+    # duong dan khi chuyen may chi can sua file config, khong sua code).
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
+
+    with open("configs/base_scene.toml", "rb") as f:
+        _cfg = tomllib.load(f)
+    _workspace_dir = Path(_cfg.get("workspace_dir", "data/workspace"))
 
     scheduler = CameraScheduler(
-        sfm_dir=sfm_path,
-        mask_meta_path=mask_meta,
-        close_up_ratio_threshold=0.08
+        sfm_dir=_cfg.get("sfm_dir", "data/sfm/sparse/0"),
+        mask_meta_path=_cfg.get("mask_meta", "data/segmentation/segmentation_meta.json"),
+        close_up_ratio_threshold=_cfg.get("close_up_ratio_threshold", 0.08)
     )
-    selected_cams = scheduler.schedule_scene_cameras(roi_sample_rate=0.5, output_file=out_schedule)
+    selected_cams = scheduler.schedule_scene_cameras(
+        roi_sample_rate=_cfg.get("roi_sample_rate", 0.5),
+        output_file=_workspace_dir / "scene_camera_schedule.json",
+    )
     print(f"Tổng số góc máy đưa vào huấn luyện Scene-GS: {len(selected_cams)}")

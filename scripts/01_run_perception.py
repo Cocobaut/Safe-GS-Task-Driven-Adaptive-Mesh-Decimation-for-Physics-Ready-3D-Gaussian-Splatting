@@ -1,6 +1,5 @@
 import os
 import sys
-import yaml
 import time
 import argparse
 from pathlib import Path
@@ -9,6 +8,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
+from src.common.config_loader import load_toml_config
 from src.module1_perception.sfm_pipeline import SfMPipeline
 from src.module1_perception.segmenter import RMBG2Segmenter
 
@@ -21,7 +21,7 @@ def parse_args():
         "--config",
         type=str,
         default=None,
-        help="Đường dẫn tới file cấu hình dataset (VD: configs/datasets/dtu_scan24.yaml). Nếu không có, dùng mặc định."
+        help="Đường dẫn tới file cấu hình dataset (VD: configs/datasets/dtu_scan24.toml). Nếu không có, dùng mặc định."
     )
     parser.add_argument(
         "--images_dir",
@@ -56,10 +56,9 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # Thiết lập đường dẫn từ file YAML hoặc từ tham số dòng lệnh
+    # Thiết lập đường dẫn từ file TOML hoặc từ tham số dòng lệnh
     if args.config and Path(args.config).exists():
-        with open(args.config, "r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f)
+        cfg = load_toml_config(args.config)
         images_dir = Path(cfg.get("raw_image_dir", args.images_dir))
         workspace_dir = Path(cfg.get("workspace_dir", args.workspace_dir))
         camera_model = cfg.get("camera_model", "PINHOLE")

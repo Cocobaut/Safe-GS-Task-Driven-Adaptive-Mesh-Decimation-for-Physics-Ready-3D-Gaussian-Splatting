@@ -1,6 +1,5 @@
 import os
 import json
-import yaml
 import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple, Union, List, Optional
@@ -139,7 +138,15 @@ class GSComposer:
 
 
 if __name__ == "__main__":
-    workspace = r"E:\Hcmut material\Project_Safe_GS\tmp\workspace"
-    
-    composer = GSComposer(workspace_dir=workspace)
+    # Doc duong dan tu configs/object_roi.toml thay vi hard-code (thay doi
+    # duong dan khi chuyen may chi can sua file config, khong sua code).
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
+
+    with open("configs/object_roi.toml", "rb") as f:
+        _cfg = tomllib.load(f)
+
+    composer = GSComposer(workspace_dir=_cfg.get("workspace_dir", "data/workspace"))
     composer.compose()

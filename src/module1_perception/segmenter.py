@@ -150,9 +150,20 @@ class RMBG2Segmenter:
 
 
 if __name__ == "__main__":
-    raw_image_directionary = r"E:\Hcmut material\Project_Safe_GS\Data\Replica\office0\results\image\mask"
-    mask_output_directionary = r"E:\Hcmut material\Project_Safe_GS\tmp\mask"
-    vis_output_directionary = r"E:\Hcmut material\Project_Safe_GS\tmp\vis"
+    # Doc duong dan tu configs/base_scene.toml thay vi hard-code (thay doi
+    # duong dan khi chuyen may chi can sua file config, khong sua code).
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
+
+    with open("configs/base_scene.toml", "rb") as f:
+        _cfg = tomllib.load(f)
+    _workspace_dir = Path(_cfg.get("workspace_dir", "data/workspace"))
+
+    raw_image_directionary = _cfg.get("raw_image_dir", "data/raw")
+    mask_output_directionary = str(_workspace_dir / "segmentation")
+    vis_output_directionary = str(_workspace_dir / "segmentation" / "vis")
 
     segmenter = RMBG2Segmenter(
         model_name_or_path="briaai/RMBG-2.0",

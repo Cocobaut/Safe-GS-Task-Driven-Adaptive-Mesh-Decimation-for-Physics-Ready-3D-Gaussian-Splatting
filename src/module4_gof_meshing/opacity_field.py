@@ -245,3 +245,28 @@ def make_diff_rasterizer_integrator(
         return {"alpha_integrated": alpha_integrated, "color_integrated": color_integrated}
 
     return integrate_fn
+
+
+def make_diff_rasterizer_integrator_from_config(
+    gaussians: object,
+    background: torch.Tensor,
+    config_path: str,
+) -> IntegrateFn:
+    """Nhu ``make_diff_rasterizer_integrator`` nhung doc ``kernel_size``,
+    ``scaling_modifier``, ``compute_debug`` tu ``configs/gof_meshing.toml``
+    thay vi truyen tay.
+    """
+    from src.common.config_loader import load_toml_config
+
+    cfg = load_toml_config(config_path)
+    if "kernel_size" not in cfg:
+        raise KeyError(
+            f"Thieu key bat buoc 'kernel_size' trong file config: {config_path}"
+        )
+    return make_diff_rasterizer_integrator(
+        gaussians,
+        background,
+        kernel_size=cfg["kernel_size"],
+        scaling_modifier=cfg.get("scaling_modifier", 1.0),
+        compute_debug=cfg.get("compute_debug", False),
+    )
