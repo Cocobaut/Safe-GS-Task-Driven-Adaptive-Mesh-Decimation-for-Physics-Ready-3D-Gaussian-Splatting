@@ -8,27 +8,24 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import mesh_cleaning
-import connected_components
-import topology_repair
-import roi_subroi_mapping
-import qem_adaptive_mesh
-import mesh_subroi_linking
-import adaptive_mesh_selection
-import mesh_quality_validation
-import collision_mesh_generation
+try:
+    from . import adaptive_mesh, collision_mesh, mesh_preprocessing, mesh_selection, mesh_validation, topology_repair
+except ImportError:
+    import adaptive_mesh
+    import collision_mesh
+    import mesh_preprocessing
+    import mesh_selection
+    import mesh_validation
+    import topology_repair
 
 
 def main():
-    mesh_cleaning.main()
-    connected_components.main()
+    mesh_preprocessing.main()
     topology_repair.main()
-    roi_subroi_mapping.main()
-    qem_adaptive_mesh.main()
-    mesh_subroi_linking.main()
-    adaptive_mesh_selection.main()
-    mesh_quality_validation.main()
-    collision_mesh_generation.main()
+    adaptive_mesh.main()
+    mesh_selection.main()
+    mesh_validation.main()
+    collision_mesh.main()
     print("\nMODULE 5 PIPELINE COMPLETED")
 
 

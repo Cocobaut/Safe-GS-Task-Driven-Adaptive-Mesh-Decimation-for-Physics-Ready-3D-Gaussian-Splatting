@@ -87,9 +87,18 @@ COMPONENT_REPORT = os.path.join(OUTPUT_DIR, "ConnectedComponentReport_ROI1.json"
 REPAIRED_MESH = os.path.join(OUTPUT_DIR, "TopologyRepaired_Object_ROI1.ply")
 TOPOLOGY_REPORT = os.path.join(OUTPUT_DIR, "TopologyRepairReport_ROI1.json")
 ROI_MAPPING_REPORT = os.path.join(OUTPUT_DIR, "ROISubROIMappingReport_ROI1.json")
+ROI_LABELS = os.path.join(OUTPUT_DIR, "TriangleSubROILabels_ROI1.npy")
+TRIANGLE_CENTROIDS = os.path.join(OUTPUT_DIR, "TriangleCentroids_ROI1.npy")
+TRIANGLE_ROI_DISTANCES = os.path.join(OUTPUT_DIR, "TriangleROIDistances_ROI1.npy")
+TRIANGLE_SPATIAL_INFLUENCE = os.path.join(
+    OUTPUT_DIR,
+    "TriangleSpatialInfluence_ROI1.npy",
+)
 ADAPTIVE_DIR = os.path.join(OUTPUT_DIR, "AdaptiveMeshes_ROI1")
 QEM_REPORT = os.path.join(ADAPTIVE_DIR, "QEMAdaptiveMeshReport_ROI1.json")
 LINKING_DIR = os.path.join(OUTPUT_DIR, "MeshSubROILinking_ROI1")
+LINKING_REPORT = os.path.join(LINKING_DIR, "MeshSubROILinkingSummary_ROI1.json")
+LINKING_MAPPING = os.path.join(LINKING_DIR, "MeshSubROIMapping_ROI1.json")
 SELECTION_DIR = os.path.join(OUTPUT_DIR, "AdaptiveMeshSelection_ROI1")
 SELECTED_MESH = os.path.join(SELECTION_DIR, "Selected_Mesh_ROI1.ply")
 SELECTION_REPORT = os.path.join(SELECTION_DIR, "AdaptiveMeshSelectionReport_ROI1.json")

@@ -8,15 +8,26 @@ import open3d as o3d
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from roi_config import (
-    COMPONENT_MESH,
-    MAX_HOLE_LOOP_EDGES,
-    OUTPUT_DIR,
-    REPAIRED_MESH,
-    TOPOLOGY_REPORT,
-    ensure_dir,
-    maybe_visualize,
-)
+try:
+    from .roi_config import (
+        COMPONENT_MESH,
+        MAX_HOLE_LOOP_EDGES,
+        OUTPUT_DIR,
+        REPAIRED_MESH,
+        TOPOLOGY_REPORT,
+        ensure_dir,
+        maybe_visualize,
+    )
+except ImportError:
+    from roi_config import (
+        COMPONENT_MESH,
+        MAX_HOLE_LOOP_EDGES,
+        OUTPUT_DIR,
+        REPAIRED_MESH,
+        TOPOLOGY_REPORT,
+        ensure_dir,
+        maybe_visualize,
+    )
 
 
 def analyze_topology(mesh):
