@@ -1,363 +1,167 @@
-import open3d as o3d
-import numpy as np
-import os
 import json
+import os
+import sys
 
+import open3d as o3d
 
-# ============================================================
-# CONFIG
-# ============================================================
-
-INPUT_PATH = (
-    r"src\modult5_postprocessing\Output"
-    r"\TopologyRepaired_Object_ROI1.ply"
+sys.path.insert(
+    0,
+    os.path.dirname(os.path.abspath(__file__))
 )
 
-OUTPUT_DIR = (
-    r"src\modult5_postprocessing\Output"
-    r"\AdaptiveMeshes_ROI1"
+from roi_config import (
+    ADAPTIVE_DIR,
+    QEM_REPORT,
+    REPAIRED_MESH,
+    TARGET_TRIANGLES,
+    ensure_dir,
 )
 
-REPORT_PATH = os.path.join(
-    OUTPUT_DIR,
-    "QEMAdaptiveMeshReport_ROI1.json"
-)
-
-
-# ============================================================
-# TARGET TRIANGLE COUNTS
-# ============================================================
-
-TARGET_TRIANGLES = {
-
-    # Original mesh
-    "M0_HighRes": None,
-
-    # QEM simplification levels
-    "M1_MediumHigh": 18000,
-
-    "M2_Medium": 12000,
-
-    "M3_Coarse": 6000
-}
-
-
-# ============================================================
-# MESH STATISTICS
-# ============================================================
 
 def mesh_statistics(mesh):
-
-    vertices = np.asarray(
-        mesh.vertices
-    )
-
-    triangles = np.asarray(
-        mesh.triangles
-    )
-
     return {
-        "vertices": int(
-            len(vertices)
-        ),
-
-        "triangles": int(
-            len(triangles)
-        )
+        "vertices": int(len(mesh.vertices)),
+        "triangles": int(len(mesh.triangles)),
     }
 
 
-# ============================================================
-# CLEAN MESH
-# ============================================================
-
 def clean_mesh(mesh):
-
-    # Remove invalid triangles
     mesh.remove_degenerate_triangles()
-
-    # Remove duplicated triangles
     mesh.remove_duplicated_triangles()
-
-    # Remove vertices that are not referenced
     mesh.remove_unreferenced_vertices()
-
-    # Recalculate normals
     mesh.compute_vertex_normals()
-
     return mesh
 
 
-# ============================================================
-# QEM SIMPLIFICATION
-# ============================================================
+def simplify_mesh(mesh, target_triangles):
+    """
+    Simplify the mesh using QEM.
+    """
 
-def simplify_mesh(
-    mesh,
-    target_triangles
-):
+    if (
+        target_triangles is None
+        or target_triangles <= 0
+        or len(mesh.triangles) <= target_triangles
+    ):
+        return o3d.geometry.TriangleMesh(mesh)
 
-    print(
-        f"    Target triangles: "
-        f"{target_triangles}"
+    simplified = mesh.simplify_quadric_decimation(
+        target_number_of_triangles=int(target_triangles)
     )
 
-    simplified = (
-        mesh.simplify_quadric_decimation(
-            target_number_of_triangles=
-            target_triangles
-        )
-    )
+    return clean_mesh(simplified)
 
-    simplified = clean_mesh(
-        simplified
-    )
-
-    return simplified
-
-
-# ============================================================
-# MAIN
-# ============================================================
 
 def main():
 
-    print("=" * 65)
+    print("=" * 70)
     print("STEP 5 - QEM ADAPTIVE MESH GENERATION")
-    print("=" * 65)
+    print("=" * 70)
 
-    # --------------------------------------------------------
-    # 1. CREATE OUTPUT DIRECTORY
-    # --------------------------------------------------------
+    ensure_dir(ADAPTIVE_DIR)
 
-    os.makedirs(
-        OUTPUT_DIR,
-        exist_ok=True
-    )
+    # ------------------------------------------------------------
+    # 1. Load topology-repaired mesh
+    # ------------------------------------------------------------
+    print("\n[1] Loading topology-repaired mesh...")
 
-    # --------------------------------------------------------
-    # 2. LOAD INPUT MESH
-    # --------------------------------------------------------
+    print("Input:", REPAIRED_MESH)
 
-    print(
-        "\n[1] Loading topology-repaired mesh..."
-    )
-
-    mesh = o3d.io.read_triangle_mesh(
-        INPUT_PATH
-    )
+    mesh = o3d.io.read_triangle_mesh(REPAIRED_MESH)
 
     if mesh.is_empty():
-
         raise RuntimeError(
             "Input mesh is empty or cannot be loaded."
         )
 
     mesh.remove_unreferenced_vertices()
-
     mesh.compute_vertex_normals()
 
-    original_stats = mesh_statistics(
-        mesh
-    )
+    original_stats = mesh_statistics(mesh)
 
-    print(
-        "Vertices :",
-        original_stats["vertices"]
-    )
+    print("Vertices :", original_stats["vertices"])
+    print("Triangles:", original_stats["triangles"])
 
-    print(
-        "Triangles:",
-        original_stats["triangles"]
-    )
-
-    # --------------------------------------------------------
-    # 3. GENERATE ADAPTIVE MESH LEVELS
-    # --------------------------------------------------------
-
-    print(
-        "\n[2] Generating QEM mesh levels..."
-    )
+    # ------------------------------------------------------------
+    # 2. Generate multiple QEM mesh levels
+    # ------------------------------------------------------------
+    print("\n[2] Generating QEM mesh levels...")
 
     report = {
-
-        "input": INPUT_PATH,
-
+        "input": REPAIRED_MESH,
         "original_mesh": original_stats,
-
-        "meshes": {}
+        "method": "Global QEM simplification",
+        "meshes": {},
     }
 
-    for mesh_name, target in (
-        TARGET_TRIANGLES.items()
-    ):
+    for mesh_name, target in TARGET_TRIANGLES.items():
 
-        print(
-            "\n" + "-" * 60
-        )
+        print("\n" + "-" * 60)
+        print(mesh_name)
+        print("-" * 60)
 
-        print(
-            mesh_name
-        )
-
-        print(
-            "-" * 60
-        )
-
-        # ----------------------------------------------------
-        # M0 - ORIGINAL
-        # ----------------------------------------------------
-
+        # M0 = original high-resolution mesh
         if target is None:
-
-            current_mesh = (
-                o3d.geometry.TriangleMesh(
-                    mesh
-                )
-            )
-
-        # ----------------------------------------------------
-        # M1/M2/M3 - QEM
-        # ----------------------------------------------------
+            current_mesh = o3d.geometry.TriangleMesh(mesh)
 
         else:
-
-            # Never request a target larger
-            # than the original mesh.
-
-            if target >= len(mesh.triangles):
-
-                print(
-                    "Target is larger than "
-                    "original mesh."
-                )
-
-                print(
-                    "Using original mesh."
-                )
-
-                current_mesh = (
-                    o3d.geometry.TriangleMesh(
-                        mesh
-                    )
-                )
-
-            else:
-
-                current_mesh = simplify_mesh(
-                    mesh,
-                    target
-                )
-
-        # ----------------------------------------------------
-        # STATISTICS
-        # ----------------------------------------------------
-
-        stats = mesh_statistics(
-            current_mesh
-        )
-
-        original_triangles = (
-            original_stats[
-                "triangles"
-            ]
-        )
-
-        reduction = (
-
-            (
-                original_triangles
-                - stats["triangles"]
+            current_mesh = simplify_mesh(
+                mesh,
+                target
             )
-            / original_triangles
-            * 100
 
-            if original_triangles > 0
-            else 0
-        )
+        stats = mesh_statistics(current_mesh)
 
-        stats[
-            "triangle_reduction_percent"
-        ] = float(reduction)
-
-        # ----------------------------------------------------
-        # SAVE
-        # ----------------------------------------------------
+        # Triangle reduction
+        if original_stats["triangles"] > 0:
+            reduction = (
+                (original_stats["triangles"]
+                 - stats["triangles"])
+                / original_stats["triangles"]
+                * 100.0
+            )
+        else:
+            reduction = 0.0
 
         output_path = os.path.join(
-            OUTPUT_DIR,
+            ADAPTIVE_DIR,
             f"{mesh_name}.ply"
         )
 
-        success = (
-            o3d.io.write_triangle_mesh(
-                output_path,
-                current_mesh
-            )
+        success = o3d.io.write_triangle_mesh(
+            output_path,
+            current_mesh
         )
 
         if not success:
-
             raise RuntimeError(
                 f"Failed to save {mesh_name}"
             )
 
-        print(
-            "Saved:",
-            output_path
-        )
-
-        print(
-            "Vertices:",
-            stats["vertices"]
-        )
-
-        print(
-            "Triangles:",
-            stats["triangles"]
-        )
-
-        print(
-            f"Reduction: "
-            f"{reduction:.2f}%"
-        )
-
-        # ----------------------------------------------------
-        # REPORT
-        # ----------------------------------------------------
+        print("Saved:", output_path)
+        print("Vertices :", stats["vertices"])
+        print("Triangles:", stats["triangles"])
+        print(f"Reduction: {reduction:.2f}%")
 
         report["meshes"][mesh_name] = {
-
-            "target_triangles":
+            "target_triangles": (
                 None
                 if target is None
-                else int(target),
-
-            "actual_vertices":
-                stats["vertices"],
-
-            "actual_triangles":
-                stats["triangles"],
-
-            "triangle_reduction_percent":
-                stats[
-                    "triangle_reduction_percent"
-                ],
-
-            "output":
-                output_path
+                else int(target)
+            ),
+            "actual_vertices": stats["vertices"],
+            "actual_triangles": stats["triangles"],
+            "triangle_reduction_percent": float(
+                reduction
+            ),
+            "output": output_path,
         }
 
-    # --------------------------------------------------------
-    # 4. SAVE REPORT
-    # --------------------------------------------------------
-
-    print(
-        "\n[3] Saving QEM report..."
-    )
-
+    # ------------------------------------------------------------
+    # 3. Save report
+    # ------------------------------------------------------------
     with open(
-        REPORT_PATH,
+        QEM_REPORT,
         "w",
         encoding="utf-8"
     ) as f:
@@ -368,57 +172,12 @@ def main():
             indent=4
         )
 
-    print(
-        "Report saved:"
-    )
+    print("\nReport saved:", QEM_REPORT)
 
-    print(
-        REPORT_PATH
-    )
+    print("\n" + "=" * 70)
+    print("STEP 5 COMPLETED")
+    print("=" * 70)
 
-    # --------------------------------------------------------
-    # 5. SUMMARY
-    # --------------------------------------------------------
-
-    print(
-        "\n" + "=" * 65
-    )
-
-    print(
-        "QEM ADAPTIVE MESH SUMMARY"
-    )
-
-    print(
-        "=" * 65
-    )
-
-    for name, info in (
-        report["meshes"].items()
-    ):
-
-        print(
-            f"{name:20s} "
-            f"{info['actual_triangles']:8d} triangles "
-            f"reduction = "
-            f"{info['triangle_reduction_percent']:.2f}%"
-        )
-
-    print(
-        "\n" + "=" * 65
-    )
-
-    print(
-        "STEP 5 COMPLETED"
-    )
-
-    print(
-        "=" * 65
-    )
-
-
-# ============================================================
-# RUN
-# ============================================================
 
 if __name__ == "__main__":
     main()

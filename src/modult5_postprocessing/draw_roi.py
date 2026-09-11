@@ -501,8 +501,8 @@ if not state["cancel"]:
     print("ROI Min =", roi_min)
     print("ROI Max =", roi_max)
 
-    print("\nBạn có thể copy 2 dòng này vào file config:")
-    print(f"roi_min = {roi_min.tolist()}")
-    print(f"roi_max = {roi_max.tolist()}")
+    print("\nBạn có thể copy 2 dòng này vào roi_config.py:")
+    print(f"ROI_MIN = np.array({roi_min.tolist()})")
+    print(f"ROI_MAX = np.array({roi_max.tolist()})")
 
     print("=" * 60)

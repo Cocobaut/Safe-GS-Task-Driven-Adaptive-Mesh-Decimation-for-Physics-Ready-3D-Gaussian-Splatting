@@ -1,95 +1,52 @@
-import open3d as o3d
-import numpy as np
-import os
 import json
+import os
+import sys
 from collections import defaultdict
 
+import numpy as np
+import open3d as o3d
 
-# ============================================================
-# CONFIG
-# ============================================================
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-INPUT_PATH = (
-    r"src\modult5_postprocessing\Output"
-    r"\ComponentFiltered_Object_ROI1.ply"
-)
-
-OUTPUT_DIR = (
-    r"src\modult5_postprocessing\Output"
-)
-
-OUTPUT_PATH = os.path.join(
+from roi_config import (
+    COMPONENT_MESH,
+    MAX_HOLE_LOOP_EDGES,
     OUTPUT_DIR,
-    "TopologyRepaired_Object_ROI1.ply"
+    REPAIRED_MESH,
+    TOPOLOGY_REPORT,
+    ensure_dir,
+    maybe_visualize,
 )
 
-REPORT_PATH = os.path.join(
-    OUTPUT_DIR,
-    "TopologyRepairReport_ROI1.json"
-)
-
-
-# ============================================================
-# TOPOLOGY ANALYSIS
-# ============================================================
 
 def analyze_topology(mesh):
-
-    vertices = np.asarray(mesh.vertices)
     triangles = np.asarray(mesh.triangles)
-
-    # --------------------------------------------------------
-    # Build edge -> triangles map
-    # --------------------------------------------------------
-
     edge_to_triangles = defaultdict(list)
 
     for triangle_id, tri in enumerate(triangles):
-
-        v0, v1, v2 = tri
-
-        edges = [
+        v0, v1, v2 = map(int, tri)
+        for edge in (
             tuple(sorted((v0, v1))),
             tuple(sorted((v1, v2))),
-            tuple(sorted((v2, v0)))
-        ]
-
-        for edge in edges:
-            edge_to_triangles[edge].append(
-                triangle_id
-            )
-
-    # --------------------------------------------------------
-    # Classify edges
-    # --------------------------------------------------------
+            tuple(sorted((v2, v0))),
+        ):
+            edge_to_triangles[edge].append(triangle_id)
 
     boundary_edges = []
     manifold_edges = []
     non_manifold_edges = []
 
     for edge, triangle_ids in edge_to_triangles.items():
-
         count = len(triangle_ids)
-
         if count == 1:
             boundary_edges.append(edge)
-
         elif count == 2:
             manifold_edges.append(edge)
-
-        elif count > 2:
-            non_manifold_edges.append(
-                (edge, triangle_ids)
-            )
-
-    # --------------------------------------------------------
-    # Boundary loops
-    # --------------------------------------------------------
+        else:
+            non_manifold_edges.append((edge, triangle_ids))
 
     boundary_graph = defaultdict(set)
-
     for v0, v1 in boundary_edges:
-
         boundary_graph[v0].add(v1)
         boundary_graph[v1].add(v0)
 
@@ -97,585 +54,190 @@ def analyze_topology(mesh):
     boundary_loops = []
 
     for start_vertex in boundary_graph:
-
         for next_vertex in boundary_graph[start_vertex]:
-
-            edge_key = tuple(
-                sorted(
-                    (start_vertex, next_vertex)
-                )
-            )
-
+            edge_key = tuple(sorted((start_vertex, next_vertex)))
             if edge_key in visited_edges:
                 continue
 
             loop = []
-
             current = start_vertex
             previous = None
 
             while True:
-
                 loop.append(current)
-
-                neighbors = boundary_graph[
-                    current
-                ]
-
+                neighbors = boundary_graph[current]
                 candidates = [
                     n for n in neighbors
-                    if tuple(
-                        sorted((current, n))
-                    ) not in visited_edges
+                    if tuple(sorted((current, n))) not in visited_edges
                 ]
-
                 if not candidates:
                     break
 
-                # Prefer not going back
                 if previous is not None:
-
-                    non_back = [
-                        n for n in candidates
-                        if n != previous
-                    ]
-
-                    if non_back:
-                        next_v = non_back[0]
-
-                    else:
-                        next_v = candidates[0]
-
+                    non_back = [n for n in candidates if n != previous]
+                    next_v = non_back[0] if non_back else candidates[0]
                 else:
                     next_v = candidates[0]
 
-                visited_edges.add(
-                    tuple(
-                        sorted(
-                            (current, next_v)
-                        )
-                    )
-                )
-
+                visited_edges.add(tuple(sorted((current, next_v))))
                 previous = current
                 current = next_v
-
                 if current == start_vertex:
                     break
 
-            if len(loop) >= 3:
+            if loop and loop[0] == loop[-1]:
+                loop = loop[:-1]
+            if len(loop) >= 3 and current == start_vertex:
                 boundary_loops.append(loop)
 
-    # --------------------------------------------------------
-    # Vertex manifoldness
-    # --------------------------------------------------------
-
-    vertex_triangle_map = defaultdict(list)
-
-    for triangle_id, tri in enumerate(triangles):
-
-        for vertex_id in tri:
-
-            vertex_triangle_map[
-                vertex_id
-            ].append(triangle_id)
-
-    non_manifold_vertices = []
-
-    for vertex_id, triangle_ids in vertex_triangle_map.items():
-
-        # Gather triangles incident to vertex
-        incident_triangles = set(
-            triangle_ids
-        )
-
-        # Build local adjacency through edges
-        local_graph = defaultdict(set)
-
-        for triangle_id in incident_triangles:
-
-            tri = triangles[triangle_id]
-
-            local_vertices = list(tri)
-
-            for i in range(3):
-
-                a = local_vertices[i]
-                b = local_vertices[
-                    (i + 1) % 3
-                ]
-
-                if (
-                    a == vertex_id
-                    or b == vertex_id
-                ):
-
-                    other = (
-                        b
-                        if a == vertex_id
-                        else a
-                    )
-
-                    local_graph[
-                        vertex_id
-                    ].add(other)
-
-        # Non-manifold edge incidents are already
-        # handled separately.
-        #
-        # Here we only record vertices connected
-        # to multiple local branches.
-
-        if len(
-            local_graph[vertex_id]
-        ) > len(incident_triangles):
-
-            non_manifold_vertices.append(
-                int(vertex_id)
-            )
-
     return {
-        "vertices": len(vertices),
+        "vertices": len(mesh.vertices),
         "triangles": len(triangles),
         "edges": len(edge_to_triangles),
         "boundary_edges": boundary_edges,
         "manifold_edges": manifold_edges,
         "non_manifold_edges": non_manifold_edges,
         "boundary_loops": boundary_loops,
-        "non_manifold_vertices":
-            non_manifold_vertices
+        "edge_to_triangles": edge_to_triangles,
     }
 
 
-# ============================================================
-# MAIN
-# ============================================================
+def _existing_triangle_for_edge(triangles, edge_to_triangles, v0, v1):
+    key = tuple(sorted((v0, v1)))
+    ids = edge_to_triangles.get(key, [])
+    if not ids:
+        return None
+    return np.asarray(triangles[ids[0]], dtype=np.int64)
+
+
+def _edge_winding_in_triangle(tri, v0, v1):
+    tri = [int(x) for x in tri]
+    for i in range(3):
+        a = tri[i]
+        b = tri[(i + 1) % 3]
+        if a == v0 and b == v1:
+            return 1
+        if a == v1 and b == v0:
+            return -1
+    return 0
+
+
+def fill_small_boundary_loops(mesh, max_loop_edges=MAX_HOLE_LOOP_EDGES):
+    info = analyze_topology(mesh)
+    triangles = np.asarray(mesh.triangles).tolist()
+    filled = 0
+    skipped = 0
+
+    for loop in info["boundary_loops"]:
+        if len(loop) < 3 or len(loop) > max_loop_edges:
+            skipped += 1
+            continue
+
+        sample = _existing_triangle_for_edge(
+            np.asarray(mesh.triangles),
+            info["edge_to_triangles"],
+            loop[0],
+            loop[1],
+        )
+        reverse = False
+        if sample is not None:
+            winding = _edge_winding_in_triangle(sample, loop[0], loop[1])
+            reverse = winding > 0
+
+        ordered = list(reversed(loop)) if reverse else list(loop)
+        origin = ordered[0]
+        for i in range(1, len(ordered) - 1):
+            triangles.append([origin, ordered[i], ordered[i + 1]])
+        filled += 1
+
+    mesh.triangles = o3d.utility.Vector3iVector(np.asarray(triangles, dtype=np.int32))
+    return mesh, filled, skipped
+
 
 def main():
-
     print("=" * 70)
     print("STEP 3 - TOPOLOGY DETECTION AND REPAIR")
     print("=" * 70)
-
-    # --------------------------------------------------------
-    # 1. LOAD
-    # --------------------------------------------------------
-
     print("\n[1] Loading mesh...")
 
-    mesh = o3d.io.read_triangle_mesh(
-        INPUT_PATH
-    )
-
+    mesh = o3d.io.read_triangle_mesh(COMPONENT_MESH)
     if mesh.is_empty():
-        raise RuntimeError(
-            "Mesh is empty or cannot be loaded."
-        )
+        raise RuntimeError("Mesh is empty or cannot be loaded.")
 
-    print(
-        "Vertices :",
-        len(mesh.vertices)
-    )
-
-    print(
-        "Triangles:",
-        len(mesh.triangles)
-    )
-
-    # --------------------------------------------------------
-    # 2. INITIAL TOPOLOGY ANALYSIS
-    # --------------------------------------------------------
-
-    print(
-        "\n[2] Initial topology analysis..."
-    )
+    print("Vertices :", len(mesh.vertices))
+    print("Triangles:", len(mesh.triangles))
 
     initial = analyze_topology(mesh)
+    print("\nInitial boundary edges:", len(initial["boundary_edges"]))
+    print("Initial boundary loops:", len(initial["boundary_loops"]))
+    print("Initial non-manifold edges:", len(initial["non_manifold_edges"]))
 
-    print("\n" + "=" * 70)
-    print("INITIAL TOPOLOGY")
-    print("=" * 70)
-
-    print(
-        "Vertices:",
-        initial["vertices"]
-    )
-
-    print(
-        "Triangles:",
-        initial["triangles"]
-    )
-
-    print(
-        "Edges:",
-        initial["edges"]
-    )
-
-    print(
-        "Manifold edges:",
-        len(initial["manifold_edges"])
-    )
-
-    print(
-        "Boundary edges:",
-        len(initial["boundary_edges"])
-    )
-
-    print(
-        "Non-manifold edges:",
-        len(initial["non_manifold_edges"])
-    )
-
-    print(
-        "Boundary loops:",
-        len(initial["boundary_loops"])
-    )
-
-    print(
-        "Non-manifold vertices:",
-        len(initial["non_manifold_vertices"])
-    )
-
-    # --------------------------------------------------------
-    # 3. SHOW NON-MANIFOLD EDGES
-    # --------------------------------------------------------
-
-    if initial["non_manifold_edges"]:
-
-        print(
-            "\n[3] Non-manifold edges detected:"
-        )
-
-        for edge, triangle_ids in (
-            initial["non_manifold_edges"]
-        ):
-
-            print(
-                f"Edge {edge} -> "
-                f"triangles {triangle_ids}"
-            )
-
-    else:
-
-        print(
-            "\n[3] No non-manifold edges detected."
-        )
-
-    # --------------------------------------------------------
-    # 4. REPAIR NON-MANIFOLD EDGES
-    # --------------------------------------------------------
-
-    print(
-        "\n[4] Repairing non-manifold edges..."
-    )
-
-    triangles_before = len(
-        mesh.triangles
-    )
-
-    # Open3D removes triangles associated
-    # with non-manifold edges.
+    triangles_before = len(mesh.triangles)
     mesh.remove_non_manifold_edges()
+    removed_non_manifold = triangles_before - len(mesh.triangles)
+    print("\nNon-manifold triangles removed:", removed_non_manifold)
 
-    triangles_after = len(
-        mesh.triangles
-    )
-
-    removed_non_manifold_triangles = (
-        triangles_before
-        - triangles_after
-    )
-
-    print(
-        "Triangles removed:",
-        removed_non_manifold_triangles
-    )
-
-    # --------------------------------------------------------
-    # 5. GENERAL TOPOLOGY CLEANUP
-    # --------------------------------------------------------
-
-    print(
-        "\n[5] Cleaning topology..."
-    )
+    mesh, holes_filled, holes_skipped = fill_small_boundary_loops(mesh)
+    print("Small boundary loops filled:", holes_filled)
+    print("Boundary loops skipped (too large):", holes_skipped)
 
     before = len(mesh.triangles)
-
     mesh.remove_degenerate_triangles()
-
-    degenerate_removed = (
-        before
-        - len(mesh.triangles)
-    )
-
+    degenerate_removed = before - len(mesh.triangles)
     before = len(mesh.triangles)
-
     mesh.remove_duplicated_triangles()
-
-    duplicate_removed = (
-        before
-        - len(mesh.triangles)
-    )
-
+    duplicate_removed = before - len(mesh.triangles)
     mesh.remove_unreferenced_vertices()
-
-    print(
-        "Degenerate triangles removed:",
-        degenerate_removed
-    )
-
-    print(
-        "Duplicated triangles removed:",
-        duplicate_removed
-    )
-
-    # --------------------------------------------------------
-    # 6. RECOMPUTE NORMALS
-    # --------------------------------------------------------
-
-    print(
-        "\n[6] Recomputing normals..."
-    )
-
     mesh.compute_vertex_normals()
 
-    # --------------------------------------------------------
-    # 7. FINAL TOPOLOGY ANALYSIS
-    # --------------------------------------------------------
-
-    print(
-        "\n[7] Final topology analysis..."
-    )
-
     final = analyze_topology(mesh)
-
-    print("\n" + "=" * 70)
-    print("FINAL TOPOLOGY")
-    print("=" * 70)
-
-    print(
-        "Vertices:",
-        final["vertices"]
-    )
-
-    print(
-        "Triangles:",
-        final["triangles"]
-    )
-
-    print(
-        "Edges:",
-        final["edges"]
-    )
-
-    print(
-        "Manifold edges:",
-        len(final["manifold_edges"])
-    )
-
-    print(
-        "Boundary edges:",
-        len(final["boundary_edges"])
-    )
-
-    print(
-        "Non-manifold edges:",
-        len(final["non_manifold_edges"])
-    )
-
-    print(
-        "Boundary loops:",
-        len(final["boundary_loops"])
-    )
-
-    print(
-        "Non-manifold vertices:",
-        len(final["non_manifold_vertices"])
-    )
-
-    # --------------------------------------------------------
-    # 8. WATERTIGHT CHECK
-    # --------------------------------------------------------
-
-    boundary_edges_final = len(
-        final["boundary_edges"]
-    )
-
-    non_manifold_edges_final = len(
-        final["non_manifold_edges"]
-    )
-
     watertight = (
-        boundary_edges_final == 0
-        and
-        non_manifold_edges_final == 0
+        len(final["boundary_edges"]) == 0
+        and len(final["non_manifold_edges"]) == 0
     )
 
-    print(
-        "\nWatertight:",
-        watertight
-    )
+    print("\nFinal boundary edges:", len(final["boundary_edges"]))
+    print("Final boundary loops:", len(final["boundary_loops"]))
+    print("Watertight:", watertight)
 
-    # --------------------------------------------------------
-    # 9. SAVE
-    # --------------------------------------------------------
-
-    print(
-        "\n[8] Saving repaired mesh..."
-    )
-
-    os.makedirs(
-        OUTPUT_DIR,
-        exist_ok=True
-    )
-
-    success = o3d.io.write_triangle_mesh(
-        OUTPUT_PATH,
-        mesh
-    )
-
-    if not success:
-        raise RuntimeError(
-            "Failed to save repaired mesh."
-        )
-
-    print(
-        "Saved:",
-        OUTPUT_PATH
-    )
-
-    # --------------------------------------------------------
-    # 10. SAVE REPORT
-    # --------------------------------------------------------
+    ensure_dir(OUTPUT_DIR)
+    if not o3d.io.write_triangle_mesh(REPAIRED_MESH, mesh):
+        raise RuntimeError("Failed to save repaired mesh.")
 
     report = {
-
-        "input": INPUT_PATH,
-
-        "output": OUTPUT_PATH,
-
+        "input": COMPONENT_MESH,
+        "output": REPAIRED_MESH,
         "initial": {
-            "vertices":
-                int(initial["vertices"]),
-
-            "triangles":
-                int(initial["triangles"]),
-
-            "edges":
-                int(initial["edges"]),
-
-            "boundary_edges":
-                len(initial["boundary_edges"]),
-
-            "non_manifold_edges":
-                len(initial["non_manifold_edges"]),
-
-            "boundary_loops":
-                len(initial["boundary_loops"]),
-
-            "non_manifold_vertices":
-                len(
-                    initial[
-                        "non_manifold_vertices"
-                    ]
-                )
+            "vertices": int(initial["vertices"]),
+            "triangles": int(initial["triangles"]),
+            "boundary_edges": len(initial["boundary_edges"]),
+            "non_manifold_edges": len(initial["non_manifold_edges"]),
+            "boundary_loops": len(initial["boundary_loops"]),
         },
-
         "repair": {
-            "non_manifold_triangles_removed":
-                int(
-                    removed_non_manifold_triangles
-                ),
-
-            "degenerate_triangles_removed":
-                int(
-                    degenerate_removed
-                ),
-
-            "duplicated_triangles_removed":
-                int(
-                    duplicate_removed
-                )
+            "non_manifold_triangles_removed": int(removed_non_manifold),
+            "small_holes_filled": int(holes_filled),
+            "large_holes_skipped": int(holes_skipped),
+            "degenerate_triangles_removed": int(degenerate_removed),
+            "duplicated_triangles_removed": int(duplicate_removed),
         },
-
         "final": {
-            "vertices":
-                int(final["vertices"]),
-
-            "triangles":
-                int(final["triangles"]),
-
-            "edges":
-                int(final["edges"]),
-
-            "boundary_edges":
-                len(final["boundary_edges"]),
-
-            "non_manifold_edges":
-                len(final["non_manifold_edges"]),
-
-            "boundary_loops":
-                len(final["boundary_loops"]),
-
-            "non_manifold_vertices":
-                len(
-                    final[
-                        "non_manifold_vertices"
-                    ]
-                ),
-
-            "watertight":
-                bool(watertight)
-        }
+            "vertices": int(final["vertices"]),
+            "triangles": int(final["triangles"]),
+            "boundary_edges": len(final["boundary_edges"]),
+            "non_manifold_edges": len(final["non_manifold_edges"]),
+            "boundary_loops": len(final["boundary_loops"]),
+            "watertight": bool(watertight),
+        },
     }
 
-    with open(
-        REPORT_PATH,
-        "w",
-        encoding="utf-8"
-    ) as f:
+    with open(TOPOLOGY_REPORT, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=4)
 
-        json.dump(
-            report,
-            f,
-            indent=4
-        )
-
-    print(
-        "Report saved:",
-        REPORT_PATH
-    )
-
-    # --------------------------------------------------------
-    # 11. VISUALIZATION
-    # --------------------------------------------------------
-
-    print(
-        "\nOpening repaired mesh..."
-    )
-
-    mesh.paint_uniform_color(
-        [0.7, 0.7, 0.7]
-    )
-
-    o3d.visualization.draw_geometries(
-        [mesh],
-        window_name="Topology Repaired Mesh",
-        width=1400,
-        height=900
-    )
-
-    print(
-        "\n" + "=" * 70
-    )
-
-    print(
-        "STEP 3 COMPLETED"
-    )
-
-    print(
-        "=" * 70
-    )
+    print("Saved:", REPAIRED_MESH)
+    print("Report:", TOPOLOGY_REPORT)
+    maybe_visualize(mesh, "Topology Repaired Mesh")
+    print("\nSTEP 3 COMPLETED")
 
 
 if __name__ == "__main__":

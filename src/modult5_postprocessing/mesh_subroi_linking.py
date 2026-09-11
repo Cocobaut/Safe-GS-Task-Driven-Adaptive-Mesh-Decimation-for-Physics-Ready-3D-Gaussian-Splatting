@@ -1,228 +1,43 @@
-import open3d as o3d
-import numpy as np
-import os
 import json
+import os
+import sys
+
+import numpy as np
+import open3d as o3d
 
 
 # ============================================================
-# CONFIG
+# IMPORT CONFIG
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-OUTPUT_DIR = os.path.join(
-    BASE_DIR,
-    "Output"
+sys.path.insert(
+    0,
+    os.path.dirname(os.path.abspath(__file__))
 )
 
-ADAPTIVE_DIR = os.path.join(
-    OUTPUT_DIR,
-    "AdaptiveMeshes_ROI1"
+from roi_config import (
+    ADAPTIVE_DIR,
+    LINKING_DIR,
+    MESH_SUBROI_PAIRS,
+    create_subrois,
+    ensure_dir,
+    triangle_centroids,
+    point_inside_aabb,
 )
 
-RESULT_DIR = os.path.join(
-    OUTPUT_DIR,
-    "MeshSubROILinking_ROI1"
-)
-
 
 # ============================================================
-# ROI
+# PROCESS ONE MESH - SUBROI PAIR
 # ============================================================
 
-ROI_MIN = np.array([
-    1.31638556,
-    -1.97638444,
-    -1.12399122
-])
+def process_pair(mesh_name, subroi_name, subrois):
 
-ROI_MAX = np.array([
-    2.24038578,
-    -0.92432044,
-    -0.49570042
-])
-
-
-# ============================================================
-# MESH LEVELS
-#
-# M0 = Raw / Highest resolution
-# M1 = Medium-High
-# M2 = Medium
-# M3 = Coarse
-# ============================================================
-
-MESH_LEVELS = [
-    "M0_HighRes",
-    "M1_MediumHigh",
-    "M2_Medium",
-    "M3_Coarse"
-]
-
-
-# ============================================================
-# SUB-ROI
-#
-# Each mesh Mi has exactly one corresponding Sub-ROI Ri.
-#
-# R0 -> High-detail region
-# R1 -> Medium-High region
-# R2 -> Medium region
-# R3 -> Low-detail region
-# ============================================================
-
-ROI_CENTER = (ROI_MIN + ROI_MAX) / 2.0
-ROI_SIZE = ROI_MAX - ROI_MIN
-
-
-# Ratios define the nested Sub-ROI boundaries.
-RATIOS = [
-    0.40,   # R0
-    0.60,   # R1
-    0.80,   # R2
-    1.00    # R3
-]
-
-
-def create_aabb_from_ratio(ratio):
-    """
-    Create a centered AABB occupying 'ratio' of the
-    original ROI size along each dimension.
-    """
-
-    sub_min = (
-        ROI_CENTER
-        - ROI_SIZE * ratio / 2.0
-    )
-
-    sub_max = (
-        ROI_CENTER
-        + ROI_SIZE * ratio / 2.0
-    )
-
-    return sub_min, sub_max
-
-
-# Create Sub-ROI boundaries
-SUBROI_BOUNDS = {}
-
-for i, ratio in enumerate(RATIOS):
-
-    sub_min, sub_max = create_aabb_from_ratio(ratio)
-
-    SUBROI_BOUNDS[f"R{i}"] = {
-        "min": sub_min,
-        "max": sub_max,
-        "ratio": ratio
-    }
-
-
-# ============================================================
-# MESH <-> SUB-ROI PAIRS
-#
-# This is the core of Step 6:
-#
-# (M0, R0)
-# (M1, R1)
-# (M2, R2)
-# (M3, R3)
-# ============================================================
-
-MESH_SUBROI_PAIRS = [
-    {
-        "mesh": "M0_HighRes",
-        "subroi": "R0"
-    },
-    {
-        "mesh": "M1_MediumHigh",
-        "subroi": "R1"
-    },
-    {
-        "mesh": "M2_Medium",
-        "subroi": "R2"
-    },
-    {
-        "mesh": "M3_Coarse",
-        "subroi": "R3"
-    }
-]
-
-
-# ============================================================
-# POINT INSIDE AABB
-# ============================================================
-
-def point_inside_aabb(point, box_min, box_max):
-
-    return np.all(
-        point >= box_min
-    ) and np.all(
-        point <= box_max
-    )
-
-
-# ============================================================
-# DISTANCE FROM POINT TO SUB-ROI
-# ============================================================
-
-def point_to_aabb_distance(
-    point,
-    box_min,
-    box_max
-):
-
-    delta = np.maximum(
-        np.maximum(
-            box_min - point,
-            0
-        ),
-        point - box_max
-    )
-
-    return float(
-        np.linalg.norm(delta)
-    )
-
-
-# ============================================================
-# SPATIAL INFLUENCE
-# ============================================================
-
-SIGMA = 0.10
-
-
-def compute_spatial_influence(
-    distance,
-    sigma
-):
-
-    return float(
-        np.exp(
-            -distance / sigma
-        )
-    )
-
-
-# ============================================================
-# PROCESS ONE MESH-SUBROI PAIR
-# ============================================================
-
-def process_pair(
-    mesh_name,
-    subroi_name
-):
-
-    print("\n" + "=" * 60)
-
-    print(
-        f"PAIR: ({mesh_name}, {subroi_name})"
-    )
-
-    print("=" * 60)
-
+    print("\n" + "=" * 65)
+    print(f"PAIR: ({mesh_name}, {subroi_name})")
+    print("=" * 65)
 
     # --------------------------------------------------------
-    # LOAD MESH
+    # 1. Load adaptive mesh
     # --------------------------------------------------------
 
     mesh_path = os.path.join(
@@ -230,227 +45,112 @@ def process_pair(
         f"{mesh_name}.ply"
     )
 
-    mesh = o3d.io.read_triangle_mesh(
-        mesh_path
-    )
+    print("Mesh:", mesh_path)
+
+    if not os.path.exists(mesh_path):
+        raise FileNotFoundError(
+            f"Mesh not found:\n{mesh_path}"
+        )
+
+    mesh = o3d.io.read_triangle_mesh(mesh_path)
 
     if mesh.is_empty():
-
         raise RuntimeError(
-            f"Cannot load {mesh_path}"
+            f"Cannot load mesh:\n{mesh_path}"
         )
 
+    vertices = np.asarray(mesh.vertices)
+    triangles = np.asarray(mesh.triangles)
 
-    vertices = np.asarray(
-        mesh.vertices
-    )
-
-    triangles = np.asarray(
-        mesh.triangles
-    )
-
-
-    print(
-        "Vertices:",
-        len(vertices)
-    )
-
-    print(
-        "Triangles:",
-        len(triangles)
-    )
-
+    print("Vertices :", len(vertices))
+    print("Triangles:", len(triangles))
 
     # --------------------------------------------------------
-    # GET SUB-ROI
+    # 2. Get corresponding Sub-ROI
     # --------------------------------------------------------
 
-    subroi = SUBROI_BOUNDS[
-        subroi_name
-    ]
+    if subroi_name not in subrois:
+        raise KeyError(
+            f"Sub-ROI '{subroi_name}' not found."
+        )
 
-    subroi_min = subroi["min"]
-    subroi_max = subroi["max"]
+    box = subrois[subroi_name]
 
-
-    print(
-        "\nSub-ROI:",
-        subroi_name
-    )
-
-    print(
-        "Min:",
-        subroi_min
-    )
-
-    print(
-        "Max:",
-        subroi_max
-    )
-
+    print("\nSub-ROI:", subroi_name)
+    print("Ratio:", box["ratio"])
+    print("Detail level:", box["detail_level"])
+    print("Min:", box["min"])
+    print("Max:", box["max"])
 
     # --------------------------------------------------------
-    # COMPUTE TRIANGLE CENTROIDS
+    # 3. Calculate triangle centroids
     # --------------------------------------------------------
 
-    triangle_vertices = (
-        vertices[triangles]
-    )
-
-    centroids = np.mean(
-        triangle_vertices,
-        axis=1
-    )
-
+    centroids = triangle_centroids(mesh)
 
     # --------------------------------------------------------
-    # CHECK TRIANGLES INSIDE CORRESPONDING SUB-ROI
+    # 4. Determine triangles inside Sub-ROI
     # --------------------------------------------------------
 
-    inside_subroi = []
-
-    distances = []
-
-    influences = []
-
-
-    for centroid in centroids:
-
-        inside = point_inside_aabb(
-            centroid,
-            subroi_min,
-            subroi_max
-        )
-
-        distance = point_to_aabb_distance(
-            centroid,
-            subroi_min,
-            subroi_max
-        )
-
-        influence = compute_spatial_influence(
-            distance,
-            SIGMA
-        )
-
-        inside_subroi.append(
-            inside
-        )
-
-        distances.append(
-            distance
-        )
-
-        influences.append(
-            influence
-        )
-
-
-    inside_subroi = np.asarray(
-        inside_subroi,
+    inside = np.array(
+        [
+            point_inside_aabb(
+                centroid,
+                box["min"],
+                box["max"]
+            )
+            for centroid in centroids
+        ],
         dtype=bool
     )
 
-    distances = np.asarray(
-        distances,
-        dtype=np.float64
+    triangles_inside = int(
+        np.sum(inside)
     )
 
-    influences = np.asarray(
-        influences,
-        dtype=np.float64
-    )
+    total_triangles = len(triangles)
 
-
-    # --------------------------------------------------------
-    # STATISTICS
-    # --------------------------------------------------------
-
-    triangle_count = len(triangles)
-
-    subroi_triangle_count = int(
-        np.sum(inside_subroi)
-    )
-
-    subroi_triangle_percentage = (
-        subroi_triangle_count
-        / triangle_count
-        * 100
-        if triangle_count > 0
+    percentage = (
+        triangles_inside
+        / total_triangles
+        * 100.0
+        if total_triangles > 0
         else 0.0
     )
 
+    print(
+        "\nTriangles inside Sub-ROI:",
+        f"{triangles_inside} / {total_triangles}"
+    )
 
-    if subroi_triangle_count > 0:
-
-        mean_distance = float(
-            np.mean(
-                distances[
-                    inside_subroi
-                ]
-            )
-        )
-
-        mean_influence = float(
-            np.mean(
-                influences[
-                    inside_subroi
-                ]
-            )
-        )
-
-    else:
-
-        mean_distance = 0.0
-        mean_influence = 0.0
-
+    print(
+        f"Percentage: {percentage:.2f}%"
+    )
 
     # --------------------------------------------------------
-    # SAVE ARRAYS
+    # 5. Save triangle-to-SubROI labels
     # --------------------------------------------------------
 
-    np.save(
-        os.path.join(
-            RESULT_DIR,
-            f"{mesh_name}_{subroi_name}_TriangleCentroids.npy"
-        ),
-        centroids
+    labels_path = os.path.join(
+        LINKING_DIR,
+        f"{mesh_name}_{subroi_name}_InsideSubROI.npy"
     )
 
-
     np.save(
-        os.path.join(
-            RESULT_DIR,
-            f"{mesh_name}_{subroi_name}_InsideSubROI.npy"
-        ),
-        inside_subroi
+        labels_path,
+        inside
     )
 
-
-    np.save(
-        os.path.join(
-            RESULT_DIR,
-            f"{mesh_name}_{subroi_name}_Distances.npy"
-        ),
-        distances
+    print(
+        "Triangle labels:",
+        labels_path
     )
-
-
-    np.save(
-        os.path.join(
-            RESULT_DIR,
-            f"{mesh_name}_{subroi_name}_SpatialInfluence.npy"
-        ),
-        influences
-    )
-
 
     # --------------------------------------------------------
-    # PAIR REPORT
+    # 6. Create report
     # --------------------------------------------------------
 
     report = {
-
         "mesh": mesh_name,
 
         "subroi": subroi_name,
@@ -462,49 +162,31 @@ def process_pair(
 
         "mesh_path": mesh_path,
 
-        "vertices": int(
-            len(vertices)
-        ),
+        "mesh_statistics": {
+            "vertices": int(len(vertices)),
+            "triangles": int(len(triangles))
+        },
 
-        "triangles": int(
-            len(triangles)
-        ),
-
-        "subroi": {
-
-            "min": subroi_min.tolist(),
-
-            "max": subroi_max.tolist(),
-
-            "ratio": float(
-                subroi["ratio"]
-            )
+        "subroi_definition": {
+            "ratio": float(box["ratio"]),
+            "detail_level": box["detail_level"],
+            "min": box["min"].tolist(),
+            "max": box["max"].tolist()
         },
 
         "linking_statistics": {
+            "triangles_inside_subroi": triangles_inside,
+            "total_triangles": int(total_triangles),
+            "triangle_percentage": float(percentage)
+        },
 
-            "triangles_inside_subroi":
-                subroi_triangle_count,
-
-            "triangle_percentage":
-                float(
-                    subroi_triangle_percentage
-                ),
-
-            "mean_distance":
-                mean_distance,
-
-            "mean_spatial_influence":
-                mean_influence
-        }
+        "label_file": labels_path
     }
 
-
     report_path = os.path.join(
-        RESULT_DIR,
+        LINKING_DIR,
         f"{mesh_name}_{subroi_name}_Report.json"
     )
-
 
     with open(
         report_path,
@@ -518,57 +200,10 @@ def process_pair(
             indent=4
         )
 
-
-    # --------------------------------------------------------
-    # PRINT RESULT
-    # --------------------------------------------------------
-
     print(
-        "\nMesh <-> Sub-ROI:"
-    )
-
-    print(
-        f"({mesh_name}, {subroi_name})"
-    )
-
-    print(
-        "\nTriangles inside Sub-ROI:"
-    )
-
-    print(
-        f"{subroi_triangle_count} "
-        f"/ {triangle_count}"
-    )
-
-    print(
-        f"Percentage: "
-        f"{subroi_triangle_percentage:.2f}%"
-    )
-
-    print(
-        "\nMean distance:"
-    )
-
-    print(
-        f"{mean_distance:.6f}"
-    )
-
-    print(
-        "\nMean spatial influence:"
-    )
-
-    print(
-        f"{mean_influence:.6f}"
-    )
-
-    print(
-        "\nSaved report:"
-    )
-
-    print(
+        "Report:",
         report_path
     )
-
 
     return report
 
@@ -579,52 +214,64 @@ def process_pair(
 
 def main():
 
-    print("=" * 60)
+    print("=" * 65)
+    print("STEP 6 - MESH <-> SUB-ROI LINKING")
+    print("=" * 65)
 
-    print(
-        "STEP 6 - MESH <-> SUB-ROI LINKING"
-    )
+    # --------------------------------------------------------
+    # 1. Prepare output directory
+    # --------------------------------------------------------
 
-    print("=" * 60)
+    ensure_dir(LINKING_DIR)
 
+    # --------------------------------------------------------
+    # 2. Create Sub-ROIs from roi_config.py
+    # --------------------------------------------------------
 
-    os.makedirs(
-        RESULT_DIR,
-        exist_ok=True
-    )
+    print("\n[1] Creating Sub-ROIs...")
 
+    subrois = create_subrois()
+
+    for name, box in subrois.items():
+
+        print(
+            f"{name}: "
+            f"ratio={box['ratio']}, "
+            f"detail={box['detail_level']}"
+        )
+
+    # --------------------------------------------------------
+    # 3. Process predefined mesh-SubROI pairs
+    # --------------------------------------------------------
+
+    print("\n[2] Processing mesh-SubROI pairs...")
 
     all_reports = {}
-
-
-    # --------------------------------------------------------
-    # PROCESS EACH (Mi, Ri) PAIR
-    # --------------------------------------------------------
 
     for pair in MESH_SUBROI_PAIRS:
 
         mesh_name = pair["mesh"]
-
         subroi_name = pair["subroi"]
-
 
         report = process_pair(
             mesh_name,
-            subroi_name
+            subroi_name,
+            subrois
         )
 
-
-        all_reports[
+        key = (
             f"({mesh_name}, {subroi_name})"
-        ] = report
+        )
 
+        all_reports[key] = report
 
     # --------------------------------------------------------
-    # SAVE MESH-SUBROI MAPPING
+    # 4. Save global mapping
     # --------------------------------------------------------
+
+    print("\n[3] Saving mesh-SubROI mapping...")
 
     mapping = {
-
         "mesh_set": [
             pair["mesh"]
             for pair in MESH_SUBROI_PAIRS
@@ -635,15 +282,24 @@ def main():
             for pair in MESH_SUBROI_PAIRS
         ],
 
-        "pairs": MESH_SUBROI_PAIRS
+        "pairs": MESH_SUBROI_PAIRS,
+
+        "mapping": {
+            pair["subroi"]: pair["mesh"]
+            for pair in MESH_SUBROI_PAIRS
+        },
+
+        "purpose": (
+            "Link each pre-generated adaptive mesh "
+            "to its corresponding Sub-ROI. "
+            "Mesh selection is performed in Step 7."
+        )
     }
 
-
     mapping_path = os.path.join(
-        RESULT_DIR,
+        LINKING_DIR,
         "MeshSubROIMapping_ROI1.json"
     )
-
 
     with open(
         mapping_path,
@@ -657,16 +313,14 @@ def main():
             indent=4
         )
 
-
     # --------------------------------------------------------
-    # SUMMARY
+    # 5. Save summary
     # --------------------------------------------------------
 
     summary_path = os.path.join(
-        RESULT_DIR,
+        LINKING_DIR,
         "MeshSubROILinkingSummary_ROI1.json"
     )
-
 
     with open(
         summary_path,
@@ -680,49 +334,19 @@ def main():
             indent=4
         )
 
-
     # --------------------------------------------------------
-    # FINAL OUTPUT
+    # 6. Final output
     # --------------------------------------------------------
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 65)
+    print("STEP 6 COMPLETED")
+    print("=" * 65)
 
-    print(
-        "STEP 6 COMPLETED"
-    )
+    print("\nMapping:")
+    print(mapping_path)
 
-    print("=" * 60)
-
-
-    print(
-        "\nMesh <-> Sub-ROI pairs:"
-    )
-
-
-    for pair in MESH_SUBROI_PAIRS:
-
-        print(
-            f"({pair['mesh']}, "
-            f"{pair['subroi']})"
-        )
-
-
-    print(
-        "\nMapping:"
-    )
-
-    print(
-        mapping_path
-    )
-
-
-    print(
-        "\nSummary:"
-    )
-
-    print(
-        summary_path
-    )
+    print("\nSummary:")
+    print(summary_path)
 
 
 # ============================================================
@@ -730,5 +354,4 @@ def main():
 # ============================================================
 
 if __name__ == "__main__":
-
     main()

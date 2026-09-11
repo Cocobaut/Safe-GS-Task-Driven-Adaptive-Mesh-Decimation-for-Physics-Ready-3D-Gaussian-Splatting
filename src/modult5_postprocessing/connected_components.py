@@ -1,604 +1,149 @@
-import open3d as o3d
-import numpy as np
 import os
 import json
+import numpy as np
+import open3d as o3d
 
-
-# ============================================================
-# CONFIG
-# ============================================================
-
-INPUT_PATH = (
-    r"src\modult5_postprocessing\Output"
-    r"\Cleaned_Object_ROI1.ply"
+from roi_config import (
+    CLEANED_MESH,
+    COMPONENT_MESH,
+    COMPONENT_LABELS,
+    COMPONENT_REPORT,
+    SMALL_COMPONENT_TRIANGLES,
+    SMALL_COMPONENT_AREA,
+    ensure_dir,
 )
 
-OUTPUT_DIR = (
-    r"src\modult5_postprocessing\Output"
-)
-
-OUTPUT_PATH = os.path.join(
-    OUTPUT_DIR,
-    "ComponentFiltered_Object_ROI1.ply"
-)
-
-LABEL_PATH = os.path.join(
-    OUTPUT_DIR,
-    "ConnectedComponents_ROI1.npy"
-)
-
-REPORT_PATH = os.path.join(
-    OUTPUT_DIR,
-    "ConnectedComponentReport_ROI1.json"
-)
-
-
-# ============================================================
-# THRESHOLD
-# ============================================================
-
-# Component có số triangle nhỏ hơn threshold
-# sẽ được xem là noise / small component.
-#
-# Mục tiêu hiện tại:
-# dùng threshold 2900 để loại component của tường.
-
-SMALL_TRIANGLES = 2900
-
-# Chỉ dùng để thống kê trong report.
-# Không dùng trực tiếp để quyết định REMOVE.
-SMALL_AREA = 0.005
-
-
-# ============================================================
-# MAIN
-# ============================================================
 
 def main():
 
-    print("=" * 60)
-    print("STEP 2 - CONNECTED COMPONENT ANALYSIS")
-    print("=" * 60)
+    # ========================================================
+    # STEP 2: CONNECTED COMPONENT FILTERING
+    # Loại bỏ các component nhỏ không mong muốn khỏi ROI mesh
+    # ========================================================
 
     # --------------------------------------------------------
-    # 1. LOAD MESH
+    # Bước 2.1: Đọc mesh sau khi Cleaning từ Step 1
     # --------------------------------------------------------
-
-    print("\n[1] Loading mesh...")
-
-    mesh = o3d.io.read_triangle_mesh(
-        INPUT_PATH
-    )
+    mesh = o3d.io.read_triangle_mesh(CLEANED_MESH)
 
     if mesh.is_empty():
-        raise RuntimeError(
-            "Mesh is empty or cannot be loaded."
-        )
+        raise RuntimeError(f"Cannot load mesh: {CLEANED_MESH}")
 
-    print(
-        "Vertices :",
-        len(mesh.vertices)
-    )
+    print(f"Vertices : {len(mesh.vertices)}")
+    print(f"Triangles: {len(mesh.triangles)}")
 
-    print(
-        "Triangles:",
-        len(mesh.triangles)
-    )
-
-    # Remove vertices that are not used.
-    # This does not change triangle topology/order.
-    mesh.remove_unreferenced_vertices()
 
     # --------------------------------------------------------
-    # 2. CONNECTED COMPONENT ANALYSIS
+    # Bước 2.2: Tìm các Connected Components
+    # Các triangle liên thông sẽ được gom thành một component
     # --------------------------------------------------------
+    triangle_clusters, cluster_n_triangles, cluster_area = \
+        mesh.cluster_connected_triangles()
 
-    print(
-        "\n[2] Analyzing connected components..."
-    )
+    triangle_clusters = np.asarray(triangle_clusters)
+    cluster_n_triangles = np.asarray(cluster_n_triangles)
+    cluster_area = np.asarray(cluster_area)
 
-    (
-        triangle_clusters,
-        cluster_n_triangles,
-        cluster_area
-    ) = mesh.cluster_connected_triangles()
+    print(f"Components: {len(cluster_n_triangles)}")
 
-    triangle_clusters = np.asarray(
-        triangle_clusters
-    )
-
-    cluster_n_triangles = np.asarray(
-        cluster_n_triangles
-    )
-
-    cluster_area = np.asarray(
-        cluster_area
-    )
-
-    num_components = len(
-        cluster_n_triangles
-    )
-
-    print(
-        "\nNumber of components:",
-        num_components
-    )
 
     # --------------------------------------------------------
-    # 3. COMPONENT INFORMATION
+    # Bước 2.3: Xác định component cần giữ / loại bỏ
+    # Component < 2900 triangles → REMOVE
+    # Component >= 2900 triangles → KEEP
     # --------------------------------------------------------
-
-    print(
-        "\n" + "=" * 75
+    keep_mask = (
+        cluster_n_triangles >= SMALL_COMPONENT_TRIANGLES
     )
 
-    print(
-        "COMPONENT INFORMATION"
-    )
-
-    print(
-        "=" * 75
-    )
-
-    print(
-        f"{'ID':>6} "
-        f"{'Triangles':>12} "
-        f"{'Area':>15} "
-        f"{'Decision':>12}"
-    )
-
-    print("-" * 75)
-
-    keep_components = []
-    remove_components = []
-
-    # Sort components from largest to smallest
-    order = np.argsort(
-        -cluster_n_triangles
-    )
-
-    for component_id in order:
-
-        n_triangles = int(
-            cluster_n_triangles[
-                component_id
-            ]
-        )
-
-        area = float(
-            cluster_area[
-                component_id
-            ]
-        )
-
-        # ----------------------------------------------------
-        # Noise criterion
-        # ----------------------------------------------------
-        #
-        # Component is removed ONLY when
-        # number of triangles < 2900.
-        #
-        # Area is reported but not used for filtering.
-        #
-
-        is_small = (
-            n_triangles < SMALL_TRIANGLES
-        )
-
-        if is_small:
-
-            decision = "REMOVE"
-
-            remove_components.append(
-                int(component_id)
-            )
-
-        else:
-
-            decision = "KEEP"
-
-            keep_components.append(
-                int(component_id)
-            )
+    for i in range(len(cluster_n_triangles)):
+        status = "KEEP" if keep_mask[i] else "REMOVE"
 
         print(
-            f"{component_id:6d} "
-            f"{n_triangles:12d} "
-            f"{area:15.6f} "
-            f"{decision:>12}"
+            f"Component {i}: "
+            f"{cluster_n_triangles[i]} triangles, "
+            f"area={cluster_area[i]:.6f} -> {status}"
         )
 
-    # --------------------------------------------------------
-    # 4. MAIN COMPONENT
-    # --------------------------------------------------------
-
-    largest_component = int(
-        order[0]
-    )
-
-    print(
-        "\n" + "=" * 60
-    )
-
-    print(
-        "MAIN COMPONENT"
-    )
-
-    print(
-        "=" * 60
-    )
-
-    print(
-        "Largest component ID:",
-        largest_component
-    )
-
-    print(
-        "Triangles:",
-        int(
-            cluster_n_triangles[
-                largest_component
-            ]
-        )
-    )
-
-    print(
-        "Area:",
-        float(
-            cluster_area[
-                largest_component
-            ]
-        )
-    )
 
     # --------------------------------------------------------
-    # 5. BUILD TRIANGLE MASK
+    # Bước 2.4: Loại bỏ các triangle thuộc component nhỏ
     # --------------------------------------------------------
+    triangle_keep = keep_mask[triangle_clusters]
 
-    print(
-        "\n[3] Filtering noisy components..."
+    filtered_mesh = o3d.geometry.TriangleMesh(mesh)
+
+    filtered_mesh.remove_triangles_by_mask(
+        ~triangle_keep
     )
 
-    keep_mask = np.isin(
-        triangle_clusters,
-        keep_components
-    )
-
-    remove_mask = ~keep_mask
-
-    removed_triangles = int(
-        np.sum(remove_mask)
-    )
-
-    kept_triangles = int(
-        np.sum(keep_mask)
-    )
-
-    print(
-        "Triangles removed:",
-        removed_triangles
-    )
-
-    print(
-        "Triangles kept:",
-        kept_triangles
-    )
-
-    # --------------------------------------------------------
-    # 6. CREATE FILTERED MESH
-    # --------------------------------------------------------
-
-    print(
-        "\n[4] Creating filtered mesh..."
-    )
-
-    triangles = np.asarray(
-        mesh.triangles
-    )
-
-    vertices = np.asarray(
-        mesh.vertices
-    )
-
-    filtered_triangles = (
-        triangles[keep_mask]
-    )
-
-    filtered_mesh = (
-        o3d.geometry.TriangleMesh()
-    )
-
-    filtered_mesh.vertices = (
-        o3d.utility.Vector3dVector(
-            vertices
-        )
-    )
-
-    filtered_mesh.triangles = (
-        o3d.utility.Vector3iVector(
-            filtered_triangles
-        )
-    )
-
-    # --------------------------------------------------------
-    # IMPORTANT
-    # --------------------------------------------------------
-    #
-    # Do NOT run:
-    #
-    # remove_degenerate_triangles()
-    # remove_duplicated_triangles()
-    #
-    # here because these operations can change the
-    # triangle ordering/count and make filtered_labels
-    # no longer correspond to the output mesh.
-    #
-    # Bước 1 already performs mesh cleaning.
-    #
-
+    # Xóa vertex không còn được triangle nào sử dụng
     filtered_mesh.remove_unreferenced_vertices()
 
+    # Tính lại normal cho mesh sau khi lọc
     filtered_mesh.compute_vertex_normals()
 
-    # --------------------------------------------------------
-    # 7. SAVE FILTERED COMPONENT LABELS
-    # --------------------------------------------------------
-
-    print(
-        "\n[5] Saving component labels..."
-    )
-
-    # These labels correspond to the triangles
-    # selected by keep_mask.
-    #
-    # Triangle ordering is preserved.
-
-    filtered_labels = (
-        triangle_clusters[keep_mask]
-    )
-
-    np.save(
-        LABEL_PATH,
-        filtered_labels
-    )
-
-    print(
-        "Component labels saved:"
-    )
-
-    print(
-        LABEL_PATH
-    )
 
     # --------------------------------------------------------
-    # 8. SAVE FILTERED MESH
+    # Bước 2.5: Lưu mesh sau khi lọc
     # --------------------------------------------------------
+    ensure_dir(os.path.dirname(COMPONENT_MESH))
 
-    print(
-        "\n[6] Saving component-filtered mesh..."
-    )
-
-    os.makedirs(
-        OUTPUT_DIR,
-        exist_ok=True
-    )
-
-    success = o3d.io.write_triangle_mesh(
-        OUTPUT_PATH,
+    o3d.io.write_triangle_mesh(
+        COMPONENT_MESH,
         filtered_mesh
     )
 
-    if not success:
-        raise RuntimeError(
-            "Failed to save filtered mesh."
-        )
-
-    print(
-        "Saved:",
-        OUTPUT_PATH
-    )
 
     # --------------------------------------------------------
-    # 9. REPORT
+    # Bước 2.6: Lưu label của các triangle còn lại
     # --------------------------------------------------------
-
-    triangles_before = len(
-        mesh.triangles
+    np.save(
+        COMPONENT_LABELS,
+        triangle_clusters[triangle_keep]
     )
 
-    triangles_after = len(
-        filtered_mesh.triangles
-    )
 
-    triangle_reduction = (
-        (
-            triangles_before
-            - triangles_after
-        )
-        / triangles_before
-        * 100
-        if triangles_before > 0
-        else 0
-    )
-
-    # Count components satisfying area threshold
-    small_area_components = [
-        int(component_id)
-        for component_id in range(
-            num_components
-        )
-        if cluster_area[component_id]
-        < SMALL_AREA
-    ]
-
+    # --------------------------------------------------------
+    # Bước 2.7: Lưu thống kê kết quả
+    # --------------------------------------------------------
     report = {
+        "input_mesh": CLEANED_MESH,
+        "output_mesh": COMPONENT_MESH,
 
-        "input":
-            INPUT_PATH,
+        # Ngưỡng dùng để quyết định REMOVE / KEEP
+        "triangle_threshold": SMALL_COMPONENT_TRIANGLES,
 
-        "output":
-            OUTPUT_PATH,
+        # Chỉ ghi vào report, không dùng để filter
+        "area_threshold_report_only": SMALL_COMPONENT_AREA,
 
-        "number_of_components":
-            int(num_components),
-
-        "largest_component":
-            int(largest_component),
-
-        "components_kept":
-            [
-                int(x)
-                for x in keep_components
-            ],
-
-        "components_removed":
-            [
-                int(x)
-                for x in remove_components
-            ],
-
-        "small_triangle_threshold":
-            SMALL_TRIANGLES,
-
-        "small_area_threshold":
-            SMALL_AREA,
-
-        "area_threshold_used_for_filtering":
-            False,
-
-        "vertices_before":
-            int(len(mesh.vertices)),
-
-        "triangles_before":
-            int(triangles_before),
-
-        "vertices_after":
-            int(len(filtered_mesh.vertices)),
-
-        "triangles_after":
-            int(triangles_after),
-
-        "triangles_removed":
-            int(
-                triangles_before
-                - triangles_after
-            ),
-
-        "triangle_reduction_percent":
-            float(triangle_reduction),
-
-        "components_below_triangle_threshold":
-            int(
-                len(remove_components)
-            ),
-
-        "components_below_area_threshold":
-            int(
-                len(small_area_components)
-            )
+        "num_components": int(len(cluster_n_triangles)),
+        "triangles_before": int(len(mesh.triangles)),
+        "triangles_after": int(len(filtered_mesh.triangles)),
+        "triangles_removed": int(
+            len(mesh.triangles)
+            - len(filtered_mesh.triangles)
+        ),
     }
 
     with open(
-        REPORT_PATH,
+        COMPONENT_REPORT,
         "w",
         encoding="utf-8"
     ) as f:
+        json.dump(report, f, indent=4)
 
-        json.dump(
-            report,
-            f,
-            indent=4
-        )
-
-    print(
-        "\nReport saved:"
-    )
-
-    print(
-        REPORT_PATH
-    )
 
     # --------------------------------------------------------
-    # 10. FINAL RESULT
+    # Kết thúc Step 2
     # --------------------------------------------------------
-
+    print("\n=== STEP 2 COMPLETED ===")
+    print(f"Triangles after : {len(filtered_mesh.triangles)}")
     print(
-        "\n" + "=" * 60
+        f"Triangles removed: "
+        f"{report['triangles_removed']}"
     )
 
-    print(
-        "CONNECTED COMPONENT RESULT"
-    )
-
-    print(
-        "=" * 60
-    )
-
-    print(
-        "Components before:",
-        num_components
-    )
-
-    print(
-        "Components kept:",
-        len(keep_components)
-    )
-
-    print(
-        "Components removed:",
-        len(remove_components)
-    )
-
-    print(
-        "Triangles before:",
-        triangles_before
-    )
-
-    print(
-        "Triangles after:",
-        triangles_after
-    )
-
-    print(
-        f"Triangle reduction: "
-        f"{triangle_reduction:.2f}%"
-    )
-
-    # --------------------------------------------------------
-    # 11. VISUALIZATION
-    # --------------------------------------------------------
-
-    print(
-        "\nOpening filtered mesh..."
-    )
-
-    filtered_mesh.paint_uniform_color(
-        [0.7, 0.7, 0.7]
-    )
-
-    o3d.visualization.draw_geometries(
-        [filtered_mesh],
-        window_name="Component Filtered Mesh",
-        width=1400,
-        height=900
-    )
-
-    print(
-        "\n" + "=" * 60
-    )
-
-    print(
-        "STEP 2 COMPLETED"
-    )
-
-    print(
-        "=" * 60
-    )
-
-
-# ============================================================
-# RUN
-# ============================================================
 
 if __name__ == "__main__":
     main()
