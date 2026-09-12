@@ -1,7 +1,7 @@
 # Cấu hình Nhánh ROI 3D (Module 2)
-sfm_dir = "E:/Hcmut material/Project_Safe_GS/tmp/sfm/sparse/0"
-masks_dir = "E:/Hcmut material/Project_Safe_GS/tmp/mask"
-workspace_dir = "E:/Hcmut material/Project_Safe_GS/tmp/workspace"
+sfm_dir = "outputs/sfm/sparse/0"
+masks_dir = "outputs/mask"
+workspace_dir = "outputs/workspace"
 
 min_views_consensus = 2
 margin_ratio = 0.1

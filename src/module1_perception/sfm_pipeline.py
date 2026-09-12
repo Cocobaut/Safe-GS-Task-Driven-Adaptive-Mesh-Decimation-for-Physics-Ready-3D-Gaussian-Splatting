@@ -12,7 +12,7 @@ import numpy as np
 
 class SfMPipeline:
     """
-    Pipeline tự động hóa Structure-from-Motion (SfM) qua COLMAP CLI (hỗ trợ CUDA RTX 3050):
+    Pipeline tự động hóa Structure-from-Motion (SfM) qua COLMAP CLI (hỗ trợ CUDA GPU):
     Trích xuất Camera Poses, Intrinsics, Mây điểm thưa và Visibility Graph.
     Tương thích COLMAP 4.x (--device CUDA).
     """
@@ -69,17 +69,34 @@ class SfMPipeline:
 
     def run_colmap_cli(self) -> bool:
         """
-        Thực thi SfM thông qua COLMAP CLI (tận dụng CUDA trên RTX 3050).
+        Thực thi SfM thông qua COLMAP CLI (tận dụng CUDA trên GPU sẵn có).
         """
         colmap_bin = self._find_colmap_binary()
 
         device_arg = "CUDA" if self.use_gpu else "CPU"
+        device_label = device_arg
+        if self.use_gpu:
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    device_label = f"CUDA ({torch.cuda.get_device_name(0)})"
+            except ImportError:
+                pass
         print(f"[Loading] Sử dụng COLMAP binary: {colmap_bin}")
-        print(f"[Loading] Chế độ thiết bị: {device_arg} (RTX 3050)")
+        print(f"[Loading] Chế độ thiết bị: {device_label}")
         print(f"[Loading] Chế độ Matching: {self.matching_method}")
 
         if self.database_path.exists():
             self.database_path.unlink()
+
+        # Dọn biến môi trường Qt bị các thư viện khác (vd opencv-python) ghi đè -
+        # opencv tự trỏ QT_QPA_PLATFORM_PLUGIN_PATH vào Qt plugin rieng cua no khi import,
+        # khien COLMAP con (dung Qt/OpenGL de khoi tao SiftGPU) bi SIGABRT vi load nham
+        # plugin xcb khong tuong thich. Xoa bien nay khoi env truyen cho subprocess de
+        # COLMAP tu tim plugin Qt he thong.
+        clean_env = os.environ.copy()
+        clean_env.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
+        clean_env.pop("QT_PLUGIN_PATH", None)
 
         # 1. Feature Extractor (SIFT trên GPU với COLMAP 4.x)
         cmd_extract = [
@@ -90,7 +107,7 @@ class SfMPipeline:
             "--ImageReader.single_camera", "1" if self.single_camera else "0",
         ]
         print("\n[Loading] [1/3] CLI: Đang trích xuất đặc trưng SIFT (Feature Extractor)...")
-        subprocess.run(cmd_extract, check=True)
+        subprocess.run(cmd_extract, check=True, env=clean_env)
 
         # 2. Feature Matching (Sequential hoặc Exhaustive)
         if self.matching_method == "sequential":
@@ -108,7 +125,7 @@ class SfMPipeline:
             ]
 
         print(f"\n[Loading] [2/3] CLI: Đang so khớp đặc trưng ({matcher_cmd_name})...")
-        subprocess.run(cmd_match, check=True)
+        subprocess.run(cmd_match, check=True, env=clean_env)
 
         # 3. Incremental Mapper
         self.sparse_model_dir.mkdir(parents=True, exist_ok=True)
@@ -119,7 +136,7 @@ class SfMPipeline:
             "--output_path", str(self.sparse_dir)
         ]
         print("\n[Loading] [3/3] CLI: Đang tái tạo 3D gia tăng (Incremental Mapper)...")
-        subprocess.run(cmd_map, check=True)
+        subprocess.run(cmd_map, check=True, env=clean_env)
 
         if not (self.sparse_model_dir / "cameras.bin").exists() and not (self.sparse_model_dir / "cameras.txt").exists():
             subdirs = [d for d in self.sparse_dir.iterdir() if d.is_dir() and d.name != "0"]
@@ -265,8 +282,14 @@ if __name__ == "__main__":
 
     with open("configs/base_scene.toml", "rb") as f:
         _cfg = tomllib.load(f)
-    raw_images = _cfg.get("raw_image_dir", "data/raw")
-    sfm_output = str(Path(_cfg.get("workspace_dir", "data/workspace")) / "sfm")
+
+    from src.common.config_loader import resolve_raw_image_dir, resolve_run_tag
+
+    raw_images = resolve_raw_image_dir(_cfg)
+    # Ghep them run_tag (vd "replica_office0") de output SfM cua tung
+    # dataset/scene khac nhau khong bi ghi de len nhau.
+    run_tag = resolve_run_tag(_cfg)
+    sfm_output = str(Path(_cfg.get("workspace_dir", "data/workspace")) / "sfm" / run_tag)
 
     if Path(raw_images).exists() and any(Path(raw_images).iterdir()):
         sfm = SfMPipeline(
@@ -274,7 +297,7 @@ if __name__ == "__main__":
             output_dir=sfm_output,
             camera_model="PINHOLE",
             single_camera=True,
-            use_gpu=True,                     # Tận dụng CUDA trên RTX 3050
+            use_gpu=True,                     # Tận dụng CUDA trên GPU sẵn có
             matching_method="sequential"      # Sequential Matching cực nhanh cho chuỗi ảnh Replica
         )
         success = sfm.run()

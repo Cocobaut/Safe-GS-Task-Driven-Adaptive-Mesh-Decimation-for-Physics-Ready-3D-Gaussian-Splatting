@@ -57,7 +57,15 @@ class CameraScheduler:
 
         # Cách 2: Fallback nếu chưa có file mask metadata (dựa vào số lượng SfM points quan sát được)
         else:
-            vis_graph_path = self.sfm_dir.parent / "visibility_graph.json"
+            # sfm_dir thuong la ".../sfm/sparse/0" (chua truc tiep points3D.bin),
+            # trong khi visibility_graph.json duoc sfm_pipeline.py ghi o ".../sfm/"
+            # (2 cap tren, chinh la ong-noi cua sparse/0) -> thu ca 2 vi tri de
+            # tuong thich voi ca truong hop sfm_dir tro thang vao "sfm/".
+            candidates = [
+                self.sfm_dir.parent.parent / "visibility_graph.json",
+                self.sfm_dir.parent / "visibility_graph.json",
+            ]
+            vis_graph_path = next((p for p in candidates if p.exists()), candidates[0])
             if vis_graph_path.exists():
                 with open(vis_graph_path, "r", encoding="utf-8") as f:
                     vis_data = json.load(f)

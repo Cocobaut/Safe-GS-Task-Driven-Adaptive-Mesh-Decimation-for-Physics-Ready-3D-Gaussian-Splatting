@@ -161,7 +161,9 @@ if __name__ == "__main__":
         _cfg = tomllib.load(f)
     _workspace_dir = Path(_cfg.get("workspace_dir", "data/workspace"))
 
-    raw_image_directionary = _cfg.get("raw_image_dir", "data/raw")
+    from src.common.config_loader import resolve_raw_image_dir
+
+    raw_image_directionary = resolve_raw_image_dir(_cfg)
     mask_output_directionary = str(_workspace_dir / "segmentation")
     vis_output_directionary = str(_workspace_dir / "segmentation" / "vis")
 

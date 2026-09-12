@@ -237,3 +237,5 @@ Data/Replica/
 !Data/**/*.md
 !Data/*.md
 !Data/**/*.md
+
+outpus/

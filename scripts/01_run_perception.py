@@ -130,8 +130,8 @@ def main():
     # =========================================================================
     meta_json_path = seg_output_dir / "segmentation_meta.json"
 
-    if args.skip_seg and meta_json_path.exists():
-        print(f"\n[BƯỚC 2/2] Bỏ qua 2D Segmentation (Đã có sẵn masks tại: {seg_output_dir})")
+    if args.skip_seg:
+        print(f"\n[BƯỚC 2/2] Bỏ qua 2D Segmentation theo yêu cầu (--skip_seg).")
     else:
         print("\n[BƯỚC 2/2] Khởi chạy 2D Segmentation bằng RMBG-2.0...")
         seg_start = time.time()
