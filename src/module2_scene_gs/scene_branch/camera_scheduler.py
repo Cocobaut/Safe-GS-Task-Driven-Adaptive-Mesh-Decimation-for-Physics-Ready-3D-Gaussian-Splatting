@@ -57,7 +57,15 @@ class CameraScheduler:
 
         # Cách 2: Fallback nếu chưa có file mask metadata (dựa vào số lượng SfM points quan sát được)
         else:
-            vis_graph_path = self.sfm_dir.parent / "visibility_graph.json"
+            # sfm_dir thuong la ".../sfm/sparse/0" (chua truc tiep points3D.bin),
+            # trong khi visibility_graph.json duoc sfm_pipeline.py ghi o ".../sfm/"
+            # (2 cap tren, chinh la ong-noi cua sparse/0) -> thu ca 2 vi tri de
+            # tuong thich voi ca truong hop sfm_dir tro thang vao "sfm/".
+            candidates = [
+                self.sfm_dir.parent.parent / "visibility_graph.json",
+                self.sfm_dir.parent / "visibility_graph.json",
+            ]
+            vis_graph_path = next((p for p in candidates if p.exists()), candidates[0])
             if vis_graph_path.exists():
                 with open(vis_graph_path, "r", encoding="utf-8") as f:
                     vis_data = json.load(f)
@@ -109,14 +117,24 @@ class CameraScheduler:
 
 
 if __name__ == "__main__":
-    sfm_path = r"E:\Hcmut material\Project_Safe_GS\tmp\sfm\sparse\0"
-    mask_meta = r"E:\Hcmut material\Project_Safe_GS\tmp\mask\segmentation_meta.json"
-    out_schedule = r"E:\Hcmut material\Project_Safe_GS\tmp\workspace\scene_camera_schedule.json"
+    # Doc duong dan tu configs/base_scene.toml thay vi hard-code (thay doi
+    # duong dan khi chuyen may chi can sua file config, khong sua code).
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
+
+    with open("configs/base_scene.toml", "rb") as f:
+        _cfg = tomllib.load(f)
+    _workspace_dir = Path(_cfg.get("workspace_dir", "data/workspace"))
 
     scheduler = CameraScheduler(
-        sfm_dir=sfm_path,
-        mask_meta_path=mask_meta,
-        close_up_ratio_threshold=0.08
+        sfm_dir=_cfg.get("sfm_dir", "data/sfm/sparse/0"),
+        mask_meta_path=_cfg.get("mask_meta", "data/segmentation/segmentation_meta.json"),
+        close_up_ratio_threshold=_cfg.get("close_up_ratio_threshold", 0.08)
     )
-    selected_cams = scheduler.schedule_scene_cameras(roi_sample_rate=0.5, output_file=out_schedule)
+    selected_cams = scheduler.schedule_scene_cameras(
+        roi_sample_rate=_cfg.get("roi_sample_rate", 0.5),
+        output_file=_workspace_dir / "scene_camera_schedule.json",
+    )
     print(f"Tổng số góc máy đưa vào huấn luyện Scene-GS: {len(selected_cams)}")

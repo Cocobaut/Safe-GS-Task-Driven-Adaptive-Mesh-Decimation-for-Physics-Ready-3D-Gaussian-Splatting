@@ -1,12 +1,12 @@
 import sys
-import yaml
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from src.module2_scene_and_roi.roi_branch.mask_to_3d import MaskTo3DProjector
-from src.module2_scene_and_roi.roi_branch.aabb_generator import AABBGenerator
-from src.module2_scene_and_roi.roi_branch.view_selection import ROIViewSelector
+from src.common.config_loader import load_toml_config
+from src.module2_scene_gs.roi_branch.mask_to_3d import MaskTo3DProjector
+from src.module2_scene_gs.roi_branch.aabb_generator import AABBGenerator
+from src.module2_scene_gs.roi_branch.view_selection import ROIViewSelector
 
 
 def main():
@@ -14,9 +14,8 @@ def main():
     print(">>> BẮT ĐẦU CHẠY MODULE 2: NHÁNH ROI 3D & SPACE PARTITIONING <<<")
     print("=" * 60)
 
-    cfg_path = "configs/object_roi.yaml"
-    with open(cfg_path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    cfg_path = "configs/object_roi.toml"
+    cfg = load_toml_config(cfg_path)
 
     workspace = Path(cfg.get("workspace_dir", "data/workspace"))
     roi_boxes_dir = workspace / "roi_boxes"

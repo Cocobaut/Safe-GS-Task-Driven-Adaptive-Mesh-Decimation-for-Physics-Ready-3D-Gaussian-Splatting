@@ -1,6 +1,5 @@
 import os
 import sys
-import yaml
 import time
 import argparse
 from pathlib import Path
@@ -9,6 +8,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
+from src.common.config_loader import load_toml_config
 from src.module3_object_composition.object_trainer import ObjectGSTrainer
 from src.module3_object_composition.gs_composer import GSComposer
 
@@ -20,8 +20,8 @@ def parse_args():
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/object_roi.yaml",
-        help="Đường dẫn tới file cấu hình (VD: configs/object_roi.yaml hoặc configs/datasets/dtu_scan24.yaml)"
+        default="configs/object_roi.toml",
+        help="Đường dẫn tới file cấu hình (VD: configs/object_roi.toml hoặc configs/datasets/dtu_scan24.toml)"
     )
     parser.add_argument(
         "--skip_training",
@@ -39,8 +39,7 @@ def main():
         print(f"[!] Lỗi: Không tìm thấy file cấu hình tại: {config_path}")
         sys.exit(1)
 
-    with open(config_path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    cfg = load_toml_config(config_path)
 
     # Xác định thư mục workspace
     workspace_dir = Path(cfg.get("workspace_dir", "data/workspace"))

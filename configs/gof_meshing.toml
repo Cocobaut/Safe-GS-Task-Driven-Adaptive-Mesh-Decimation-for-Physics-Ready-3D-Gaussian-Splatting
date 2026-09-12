@@ -1,0 +1,31 @@
+# Cấu hình Module 4 - GOF Meshing (Gaussian Opacity Fields)
+# Trích mesh thô từ Composed-3DGS bằng Ray-Gaussian intersection +
+# Marching Tetrahedra + Binary Search. Giá trị mặc định lấy từ chính
+# paper GOF (Based_Model/Gaussian Opacity Fields (GOF)/
+# gaussian-opacity-fields/{extract_mesh.py, arguments/__init__.py}).
+
+# Frustum & tetra candidate points (opacity_field.py)
+near = 0.02
+far = 1e6
+box_scale = 3.0
+
+# Rasterizer / ray-Gaussian intersection (opacity_field.py)
+kernel_size = 0.0
+scaling_modifier = 1.0
+compute_debug = false
+
+# Marching Tetrahedra (marching_tetrahedra.py)
+iso_level = 0.5
+chunk_size = 33554432  # 32 * 1024 * 1024
+
+# Binary search level set (level_set_solver.py)
+n_binary_steps = 8
+filter_mesh = true
+texture_mesh = false
+
+# Regularization — chỉ dùng khi fine-tune Composed-3DGS trước khi trích mesh
+edge_aware_distortion = false
+lambda_distortion = 100.0
+distortion_from_iter = 15000
+lambda_depth_normal = 0.05
+depth_normal_from_iter = 15000

@@ -155,13 +155,20 @@ class MaskTo3DProjector:
 
 
 if __name__ == "__main__":
-    sfm_directionary = r"E:\Hcmut material\Project_Safe_GS\tmp\sfm\sparse\0"
-    mask_directionary = r"E:\Hcmut material\Project_Safe_GS\tmp\mask"
-    output_PCD = r"E:\Hcmut material\Project_Safe_GS\tmp\workspace\roi_boxes\roi_points.ply"
+    # Doc duong dan tu configs/object_roi.toml thay vi hard-code (thay doi
+    # duong dan khi chuyen may chi can sua file config, khong sua code).
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
+
+    with open("configs/object_roi.toml", "rb") as f:
+        _cfg = tomllib.load(f)
+    _roi_boxes_dir = Path(_cfg.get("workspace_dir", "data/workspace")) / "roi_boxes"
 
     projector = MaskTo3DProjector(
-        sfm_sparse_dir=sfm_directionary,
-        masks_dir=mask_directionary,
-        min_views_consensus=2
+        sfm_sparse_dir=_cfg.get("sfm_dir", "data/sfm/sparse/0"),
+        masks_dir=_cfg.get("masks_dir", "data/segmentation"),
+        min_views_consensus=_cfg.get("min_views_consensus", 2)
     )
-    projector.save_roi_pcd(output_PCD)
+    projector.save_roi_pcd(_roi_boxes_dir / "roi_points.ply")

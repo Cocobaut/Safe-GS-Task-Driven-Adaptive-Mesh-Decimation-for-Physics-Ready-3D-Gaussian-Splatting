@@ -1,6 +1,5 @@
 import os
 import json
-import yaml
 import math
 import torch
 import numpy as np
@@ -8,6 +7,8 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Union, Optional
 from tqdm import tqdm
 from plyfile import PlyData, PlyElement
+
+from src.common.config_loader import load_toml_config
 
 # Import Differentiable Rasterizer của 3DGS
 try:
@@ -159,9 +160,8 @@ class ObjectGSTrainer:
     """
     Bộ điều khiển huấn luyện Object-GS (30k iters, confined densification trong AABB).
     """
-    def __init__(self, config_path: str = "configs/object_roi.yaml"):
-        with open(config_path, "r", encoding="utf-8") as f:
-            self.cfg = yaml.safe_load(f)
+    def __init__(self, config_path: str = "configs/object_roi.toml"):
+        self.cfg = load_toml_config(config_path)
 
         self.iterations = self.cfg.get("iterations", 30000)
         self.densify_until_iter = self.cfg.get("densify_until_iter", 15000)
