@@ -4,10 +4,10 @@
 Project_Safe_GS/
 │
 ├── configs/                            # Quản lý cấu hình huấn luyện và mô phỏng
-│   ├── base_scene.yaml                 # Config huấn luyện Scene-GS (20k iters, camera settings)
-│   ├── object_roi.yaml                 # Config huấn luyện Object-GS (AABB, densification threshold)
-│   ├── gof_meshing.yaml                # Config GOF (Tetrahedral grid, level set, binary search steps)
-│   └── simulation.yaml                 # Config Physics (MuJoCo/PhysX/PyBullet parameters, timestep)
+│   ├── base_scene.toml                 # Config huấn luyện Scene-GS (20k iters, camera settings)
+│   ├── object_roi.toml                 # Config huấn luyện Object-GS (AABB, densification threshold)
+│   ├── gof_meshing.toml                # Config GOF (Tetrahedral grid, level set, binary search steps)
+│   └── simulation.toml                 # Config Physics (MuJoCo/PhysX/PyBullet parameters, timestep)
 │
 ├── data/                               # Dữ liệu & kết quả trung gian (chuẩn hóa chữ thường)
 │   ├── raw/                            # Dữ liệu ảnh thô (RGB images, camera captures)

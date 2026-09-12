@@ -1,0 +1,34 @@
+iterations = 30000
+sh_degree = 3
+spatial_lr_scale = 1.0
+close_up_ratio_threshold = 0.08
+roi_sample_rate = 0.5
+
+# Tham so Adaptive Density Control (chuan 3DGS - Kerbl et al.)
+save_iterations = [7000, 30000]
+densify_from_iter = 500
+densify_until_iter = 15000
+densification_interval = 100
+opacity_reset_interval = 3000
+densify_grad_threshold = 0.0002
+lambda_dssim = 0.2
+
+# raw_image_dir: chi dat khi muon override thu cong 1 duong dan cu the.
+# Mac dinh de trong va dung bang [dataset] ben duoi -> tra cuu qua
+# "Dataset Configs/<name>.yaml" (xem src/common/dataset_config.py), vi vay
+# doi may/o dia chi can sua "Dataset Configs/replica.yaml" (bien root) hoac
+# set env DATASET_ROOT, khong phai sua file nay.
+# Dang override thu cong de train tren DTU scan24 (dataset da chay COLMAP xong).
+raw_image_dir = "../DTU Preprocess/DTU/scan24/images"
+sfm_dir = "outputs/workspace/dtu_scan24/sfm/sparse/0"
+mask_meta = "outputs/workspace/dtu_scan24/segmentation/segmentation_meta.json"
+workspace_dir = "outputs/workspace/dtu_scan24"
+
+[dataset]
+name = "replica"   # ung voi Dataset Configs/replica.yaml
+scene = "office0"  # ghi de bien {scene} trong yaml do
+# tag: ten thu muc rieng cho lan chay nay (vd output SfM se nam o
+# outputs/workspace/sfm/<tag>/). Bo trong -> tu dong ghep "name_scene"
+# (vd "replica_office0"). Dat vd tag = "replica_8_scene_office0" neu muon
+# ten khac.
+# tag = "replica_8_scene_office0"

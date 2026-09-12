@@ -231,8 +231,11 @@ debug/
 Data/DTU/
 Data/dtu_results/
 Data/eval_dtu/
+Data/Replica/
 
 !Data/*.md
 !Data/**/*.md
 !Data/*.md
 !Data/**/*.md
+
+outpus/
